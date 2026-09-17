@@ -1,0 +1,471 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { QrCodeGenerator } from '@/components/qr/QrCodeGenerator';
+import { QrScannerModal } from '@/components/qr/QrScannerModal';
+import { Product, BillItem, DecodedQrPayload } from '@/types';
+import { encodeBillQrPayload } from '@/lib/qr/payload';
+import {
+  Search,
+  ShoppingCart,
+  Plus,
+  Minus,
+  Trash2,
+  QrCode,
+  CheckCircle2,
+  Scan,
+  Percent,
+  Tag,
+  Store,
+  DollarSign,
+  X,
+  CreditCard,
+  Printer,
+  Sparkles,
+} from 'lucide-react';
+
+const MOCK_PRODUCTS: Product[] = [
+  { _id: 'p1', merchantId: 'm1', name: 'Fresh Milk 1L', price: 60, stock: 45, category: 'Dairy', barcode: '8901234567890', active: true, createdAt: '', updatedAt: '' },
+  { _id: 'p2', merchantId: 'm1', name: 'Whole Wheat Bread', price: 45, stock: 20, category: 'Bakery', barcode: '8901234567891', active: true, createdAt: '', updatedAt: '' },
+  { _id: 'p3', merchantId: 'm1', name: 'Potato Chips 100g', price: 30, stock: 80, category: 'Snacks', barcode: '8901234567892', active: true, createdAt: '', updatedAt: '' },
+  { _id: 'p4', merchantId: 'm1', name: 'Sparkling Soda 500ml', price: 40, stock: 35, category: 'Beverages', barcode: '8901234567893', active: true, createdAt: '', updatedAt: '' },
+  { _id: 'p5', merchantId: 'm1', name: 'Instant Coffee 100g', price: 180, stock: 15, category: 'Pantry', barcode: '8901234567894', active: true, createdAt: '', updatedAt: '' },
+  { _id: 'p6', merchantId: 'm1', name: 'Dark Chocolate Bar', price: 95, stock: 50, category: 'Snacks', barcode: '8901234567895', active: true, createdAt: '', updatedAt: '' },
+];
+
+interface CartItem extends BillItem {
+  id: string;
+  productId?: string;
+}
+
+export default function MerchantPosBillingPage() {
+  const router = useRouter();
+  const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
+  const [search, setSearch] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+
+  // Cart State
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [discount, setDiscount] = useState<number>(0);
+  const [taxPercent, setTaxPercent] = useState<number>(0);
+
+  // Custom Item Inputs
+  const [customName, setCustomName] = useState('');
+  const [customPrice, setCustomPrice] = useState('');
+
+  // Modals
+  const [qrModalOpen, setQrModalOpen] = useState<boolean>(false);
+  const [qrPayload, setQrPayload] = useState<string>('');
+  const [generatedBillId, setGeneratedBillId] = useState<string>('');
+  const [scannerOpen, setScannerOpen] = useState<boolean>(false);
+  const [checkoutSuccess, setCheckoutSuccess] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Fetch products from server if available
+    fetch('/api/products')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.products && data.products.length > 0) {
+          setProducts(data.products);
+        }
+      })
+      .catch((e) => console.warn('Using default mock catalog offline', e));
+  }, []);
+
+  const categories = ['ALL', ...Array.from(new Set(products.map((p) => p.category || 'General')))];
+
+  const filteredProducts = products.filter((p) => {
+    const matchesSearch =
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      (p.barcode && p.barcode.includes(search));
+    const matchesCategory = selectedCategory === 'ALL' || p.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const addToCart = (product: Product) => {
+    setCart((prev) => {
+      const existing = prev.find((item) => item.productId === product._id);
+      if (existing) {
+        return prev.map((item) =>
+          item.productId === product._id ? { ...item, quantity: item.quantity + 1 } : item
+        );
+      }
+      return [
+        ...prev,
+        {
+          id: product._id,
+          productId: product._id,
+          name: product.name,
+          quantity: 1,
+          price: product.price,
+        },
+      ];
+    });
+  };
+
+  const addCustomItem = (e: React.FormEvent) => {
+    e.preventDefault();
+    const priceNum = parseFloat(customPrice);
+    if (!customName || isNaN(priceNum) || priceNum <= 0) return;
+
+    const newItem: CartItem = {
+      id: `custom-${Date.now()}`,
+      name: customName,
+      quantity: 1,
+      price: priceNum,
+    };
+
+    setCart((prev) => [...prev, newItem]);
+    setCustomName('');
+    setCustomPrice('');
+  };
+
+  const updateQuantity = (id: string, delta: number) => {
+    setCart((prev) =>
+      prev
+        .map((item) => {
+          if (item.id === id) {
+            const newQty = item.quantity + delta;
+            return newQty > 0 ? { ...item, quantity: newQty } : null;
+          }
+          return item;
+        })
+        .filter(Boolean) as CartItem[]
+    );
+  };
+
+  const removeFromCart = (id: string) => {
+    setCart((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  // Calculations
+  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const taxAmount = (subtotal * taxPercent) / 100;
+  const grandTotal = Math.max(0, subtotal + taxAmount - discount);
+
+  // Generate Bill QR Action
+  const handleGenerateBillQr = async () => {
+    if (cart.length === 0) return;
+
+    const billId = `BILL-${Math.floor(1000 + Math.random() * 9000)}`;
+    const transactionId = `TXN-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+    const itemsPayload = cart.map((item) => ({
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+    }));
+
+    const encoded = encodeBillQrPayload({
+      transactionId,
+      billId,
+      merchantId: 'SHOP123',
+      merchantName: 'NoPay Store POS',
+      items: itemsPayload,
+      total: grandTotal,
+    });
+
+    setGeneratedBillId(billId);
+    setQrPayload(encoded);
+    setQrModalOpen(true);
+
+    // Sync or save bill asynchronously
+    fetch('/api/bills', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: itemsPayload,
+        subtotal,
+        discount,
+        tax: taxAmount,
+        totalAmount: grandTotal,
+      }),
+    }).catch((err) => console.warn('Saved local offline bill QR payload', err));
+  };
+
+  const handleBarcodeScanSuccess = (payload: DecodedQrPayload, rawText: string) => {
+    setScannerOpen(false);
+    // Find product matching barcode
+    const match = products.find((p) => p.barcode === rawText || p._id === rawText);
+    if (match) {
+      addToCart(match);
+    } else {
+      alert(`Barcode "${rawText}" not found in inventory.`);
+    }
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6">
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        {/* LEFT COLUMN: Catalog Workspace */}
+        <div className="flex-1 w-full space-y-5">
+          {/* Header & Search */}
+          <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-xl font-black text-navy-900">POS Inventory Catalog</h1>
+                <p className="text-xs text-slate-400">Select items to add to active cart</p>
+              </div>
+              <button
+                onClick={() => setScannerOpen(true)}
+                className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all"
+              >
+                <Scan className="w-4 h-4 text-brand-lightBlue" />
+                <span>Barcode Scan</span>
+              </button>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search products by name or barcode..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-navy-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                />
+              </div>
+            </div>
+
+            {/* Category Filter Pills */}
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+                    selectedCategory === cat
+                      ? 'bg-navy-900 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Products Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            {filteredProducts.map((p) => (
+              <div
+                key={p._id}
+                onClick={() => addToCart(p)}
+                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-brand-blue hover:shadow-md cursor-pointer transition-all space-y-3 flex flex-col justify-between group"
+              >
+                <div>
+                  <div className="flex justify-between items-start gap-1">
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md">
+                      {p.category || 'General'}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400">Stock: {p.stock}</span>
+                  </div>
+                  <h4 className="text-xs font-black text-navy-900 mt-2 group-hover:text-brand-blue transition-colors line-clamp-2">
+                    {p.name}
+                  </h4>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                  <span className="text-base font-black text-navy-900">₹{p.price.toFixed(2)}</span>
+                  <div className="w-7 h-7 bg-blue-50 text-brand-blue rounded-lg flex items-center justify-center font-black group-hover:bg-brand-blue group-hover:text-white transition-colors">
+                    +
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: Live Active POS Cart */}
+        <div className="w-full lg:w-96 bg-white rounded-3xl border border-slate-200 shadow-card p-6 space-y-6 shrink-0 sticky top-20">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="w-5 h-5 text-brand-blue" />
+              <h2 className="text-lg font-black text-navy-900">Active Bill Cart</h2>
+            </div>
+            <span className="text-xs font-bold px-2.5 py-1 bg-blue-50 text-brand-blue rounded-full">
+              {cart.reduce((sum, i) => sum + i.quantity, 0)} items
+            </span>
+          </div>
+
+          {/* Cart Item List */}
+          <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+            {cart.length === 0 ? (
+              <div className="py-8 text-center space-y-2">
+                <ShoppingCart className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-xs font-bold text-slate-400">Cart is empty</p>
+                <p className="text-[11px] text-slate-400">Click products from the catalog to add</p>
+              </div>
+            ) : (
+              cart.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs"
+                >
+                  <div className="flex-1 pr-2">
+                    <p className="font-bold text-navy-900 line-clamp-1">{item.name}</p>
+                    <p className="text-[11px] text-slate-400">₹{item.price.toFixed(2)} each</p>
+                  </div>
+
+                  {/* Quantity Controls */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => updateQuantity(item.id, -1)}
+                      className="w-6 h-6 bg-white border border-slate-200 text-slate-700 font-bold rounded flex items-center justify-center hover:bg-slate-100"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <span className="font-extrabold text-navy-900 w-4 text-center">{item.quantity}</span>
+                    <button
+                      onClick={() => updateQuantity(item.id, 1)}
+                      className="w-6 h-6 bg-white border border-slate-200 text-slate-700 font-bold rounded flex items-center justify-center hover:bg-slate-100"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => removeFromCart(item.id)}
+                      className="p-1 text-slate-400 hover:text-red-600 transition-colors ml-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Custom Quick Item Form */}
+          <form onSubmit={addCustomItem} className="pt-2 border-t border-slate-100 space-y-2">
+            <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
+              Add Custom Item
+            </span>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Item name"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                className="flex-1 px-3 py-1.5 text-xs border border-slate-200 rounded-lg text-navy-900 bg-slate-50 focus:bg-white"
+              />
+              <input
+                type="number"
+                placeholder="₹"
+                value={customPrice}
+                onChange={(e) => setCustomPrice(e.target.value)}
+                className="w-20 px-3 py-1.5 text-xs border border-slate-200 rounded-lg text-navy-900 bg-slate-50 focus:bg-white"
+              />
+              <button
+                type="submit"
+                className="px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-800"
+              >
+                Add
+              </button>
+            </div>
+          </form>
+
+          {/* Calculations Summary */}
+          <div className="bg-slate-50 p-4 rounded-2xl space-y-2 text-xs border border-slate-100">
+            <div className="flex justify-between text-slate-600">
+              <span>Subtotal</span>
+              <span>₹{subtotal.toFixed(2)}</span>
+            </div>
+
+            <div className="flex justify-between items-center text-slate-600">
+              <span>Discount (₹)</span>
+              <input
+                type="number"
+                min="0"
+                value={discount || ''}
+                onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                className="w-20 text-right px-2 py-0.5 border border-slate-200 rounded bg-white font-mono"
+              />
+            </div>
+
+            <div className="flex justify-between items-center text-slate-600">
+              <span>Tax / GST (%)</span>
+              <input
+                type="number"
+                min="0"
+                value={taxPercent || ''}
+                onChange={(e) => setTaxPercent(parseFloat(e.target.value) || 0)}
+                className="w-20 text-right px-2 py-0.5 border border-slate-200 rounded bg-white font-mono"
+              />
+            </div>
+
+            <div className="flex justify-between items-center text-sm font-black text-navy-900 pt-2 border-t border-slate-200">
+              <span>Grand Total</span>
+              <span className="text-xl text-brand-blue">₹{grandTotal.toFixed(2)}</span>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="space-y-2">
+            <button
+              onClick={handleGenerateBillQr}
+              disabled={cart.length === 0}
+              className="w-full py-3.5 bg-brand-blue hover:bg-brand-darkBlue text-white font-black rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+            >
+              <QrCode className="w-5 h-5" />
+              <span>Generate Bill QR Code</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Bill QR Modal */}
+      {qrModalOpen && (
+        <div className="fixed inset-0 bg-navy-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full space-y-6 text-center relative shadow-2xl">
+            <button
+              onClick={() => setQrModalOpen(false)}
+              className="absolute right-4 top-4 p-2 text-slate-400 hover:text-navy-900 rounded-full"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="space-y-1">
+              <span className="text-[10px] font-extrabold uppercase text-emerald-600 tracking-wider bg-emerald-50 px-3 py-1 rounded-full">
+                Bill QR Ready
+              </span>
+              <h3 className="text-xl font-black text-navy-900">Scan to Pay ₹{grandTotal.toFixed(2)}</h3>
+              <p className="text-xs text-slate-500">Bill ID: {generatedBillId}</p>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 inline-block mx-auto">
+              <QrCodeGenerator value={qrPayload} size={220} title="Itemized Bill QR" />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => window.print()}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Print QR</span>
+              </button>
+              <button
+                onClick={() => {
+                  setCart([]);
+                  setQrModalOpen(false);
+                }}
+                className="flex-1 py-2.5 bg-navy-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800"
+              >
+                Done / Next Bill
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Barcode Scanner Modal */}
+      {scannerOpen && (
+        <QrScannerModal
+          onScanSuccess={handleBarcodeScanSuccess}
+          onClose={() => setScannerOpen(false)}
+        />
+      )}
+    </div>
+  );
+}

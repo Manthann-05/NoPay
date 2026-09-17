@@ -63,3 +63,6 @@ export async function markSyncQueueState(
 export async function getAllLocalTransactions(): Promise<Transaction[]> {
   return offlineDb.transactions.orderBy('createdAt').reverse().toArray();
 }
+
+export const getOfflineTransactions = getAllLocalTransactions;
+

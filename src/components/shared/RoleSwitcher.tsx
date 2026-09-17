@@ -8,10 +8,11 @@ import { Store, Smartphone, ArrowRightLeft, PlusCircle } from 'lucide-react';
 interface RoleSwitcherProps {
   currentRole: UserRole;
   roles: UserRole[];
+  hasMerchantProfile?: boolean;
   onRoleChanged?: (newRole: UserRole) => void;
 }
 
-export function RoleSwitcher({ currentRole, roles, onRoleChanged }: RoleSwitcherProps) {
+export function RoleSwitcher({ currentRole, roles, hasMerchantProfile, onRoleChanged }: RoleSwitcherProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 

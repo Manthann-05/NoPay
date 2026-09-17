@@ -6,6 +6,8 @@ import { connectToDatabase } from '@/lib/db/mongodb';
 import { User } from '@/models/User';
 import { MerchantProfile } from '@/models/MerchantProfile';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'NoPay - Offline-First Billing & QR Synchronization',
   description: 'Offline-First Billing, QR Payment & Synchronization System for Customers and Merchants',

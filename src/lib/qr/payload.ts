@@ -1,4 +1,4 @@
-import { DecodedQrPayload, StaticMerchantQrPayload, BillQrPayload } from '@/types';
+import { DecodedQrPayload, StaticMerchantQrPayload, BillQrPayload, BillItem } from '@/types';
 
 export function parseQrPayload(raw: string): DecodedQrPayload | null {
   try {
@@ -43,7 +43,12 @@ export function parseQrPayload(raw: string): DecodedQrPayload | null {
   }
 }
 
-export function encodeStaticMerchantQrPayload(merchantId: string, merchantName: string): string {
+export function encodeStaticMerchantQrPayload(
+  arg1: string | { merchantId: string; merchantName: string },
+  arg2?: string
+): string {
+  const merchantId = typeof arg1 === 'object' ? arg1.merchantId : arg1;
+  const merchantName = typeof arg1 === 'object' ? arg1.merchantName : arg2 || '';
   const payload: StaticMerchantQrPayload = {
     type: 'MERCHANT',
     version: 1,
@@ -53,6 +58,24 @@ export function encodeStaticMerchantQrPayload(merchantId: string, merchantName: 
   return JSON.stringify(payload);
 }
 
-export function encodeBillQrPayload(bill: BillQrPayload): string {
-  return JSON.stringify(bill);
+export function encodeBillQrPayload(
+  bill: Partial<BillQrPayload> & {
+    transactionId: string;
+    billId: string;
+    merchantId: string;
+    merchantName: string;
+    items: BillItem[];
+    total: number;
+  }
+): string {
+  const fullPayload: BillQrPayload = {
+    type: 'BILL',
+    version: 1,
+    createdAt: new Date().toISOString(),
+    subtotal: bill.total,
+    discount: 0,
+    tax: 0,
+    ...bill,
+  };
+  return JSON.stringify(fullPayload);
 }

@@ -81,14 +81,16 @@ export interface Transaction {
     itemsCount: number;
     total: number;
   };
+  items?: BillItem[];
   amount: number;
   type: TransactionType;
   status: TransactionStatus;
   idempotencyKey: string;
   paymentReference?: string;
   failureReason?: string;
-  offlineCreated: boolean;
+  offlineCreated?: boolean;
   createdAt: string;
+  updatedAt?: string;
   syncedAt?: string;
 }
 
@@ -122,9 +124,9 @@ export interface BillQrPayload {
   merchantId: string;
   merchantName: string;
   items: BillItem[];
-  subtotal: number;
-  discount: number;
-  tax: number;
+  subtotal?: number;
+  discount?: number;
+  tax?: number;
   total: number;
   createdAt: string;
   expiresAt?: string;

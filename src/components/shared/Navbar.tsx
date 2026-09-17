@@ -106,7 +106,7 @@ export function Navbar({ user }: NavbarProps) {
           <nav className="hidden lg:flex items-center gap-1">
             {currentNavItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+              const isActive = pathname === item.href || Boolean(pathname?.startsWith(item.href + '/'));
               return (
                 <Link
                   key={item.href}

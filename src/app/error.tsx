@@ -1,0 +1,24 @@
+'use client';
+
+import React from 'react';
+
+export default function GlobalError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  return (
+    <div className="max-w-md mx-auto py-16 text-center space-y-4">
+      <h2 className="text-2xl font-black text-navy-900">Something went wrong</h2>
+      <p className="text-xs text-slate-500">{error.message || 'An unexpected error occurred.'}</p>
+      <button
+        onClick={() => reset()}
+        className="px-6 py-3 bg-brand-blue text-white text-xs font-bold rounded-xl shadow-md"
+      >
+        Try Again
+      </button>
+    </div>
+  );
+}

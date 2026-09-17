@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, type Document } from 'mongoose';
 
 export interface IUser extends Document {
   name: string;
@@ -16,15 +16,16 @@ const UserSchema = new Schema<IUser>(
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
-    roles: {
-      type: [String],
-      enum: ['CUSTOMER', 'MERCHANT'],
-      default: ['CUSTOMER'],
-    },
+    roles: [
+      {
+        type: String,
+        enum: ['CUSTOMER', 'MERCHANT'],
+      },
+    ],
     activeRole: {
       type: String,
       enum: ['CUSTOMER', 'MERCHANT'],
-      default: ['CUSTOMER'],
+      default: 'CUSTOMER',
     },
     merchantProfileId: { type: Schema.Types.ObjectId, ref: 'MerchantProfile' },
   },
