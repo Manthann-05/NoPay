@@ -1,0 +1,22 @@
+{
+  "name": "NoPay - Offline-First Billing & QR Payments",
+  "short_name": "NoPay",
+  "description": "Offline-First Billing, QR Payment & Synchronization System for Customers & Merchants",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B192C",
+  "theme_color": "#2563EB",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
