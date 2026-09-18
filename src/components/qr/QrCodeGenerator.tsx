@@ -2,13 +2,16 @@
 
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Download, Printer, Share2, ShieldCheck } from 'lucide-react';
+import { Download, Printer, Store, Receipt } from 'lucide-react';
+
+type QrType = 'MERCHANT' | 'BILL';
 
 interface QrCodeGeneratorProps {
   value: string;
   size?: number;
   title?: string;
   subtitle?: string;
+  qrType?: QrType;
   showActions?: boolean;
 }
 
@@ -16,7 +19,8 @@ export function QrCodeGenerator({
   value,
   size = 220,
   title = 'Scan to Pay',
-  subtitle = 'NoPay Offline-First QR',
+  subtitle = 'NoPay QR',
+  qrType,
   showActions = true,
 }: QrCodeGeneratorProps) {
   const handleDownload = () => {
@@ -52,12 +56,21 @@ export function QrCodeGenerator({
     window.print();
   };
 
+  // Type badge
+  const typeBadge = qrType === 'MERCHANT'
+    ? { label: 'Merchant QR', Icon: Store, color: 'bg-blue-50 text-brand-blue' }
+    : qrType === 'BILL'
+    ? { label: 'Bill QR', Icon: Receipt, color: 'bg-emerald-50 text-emerald-700' }
+    : null;
+
   return (
     <div className="flex flex-col items-center justify-center p-6 bg-white rounded-3xl border border-slate-200 shadow-card text-center max-w-sm mx-auto">
-      <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-brand-blue rounded-full text-xs font-bold mb-4">
-        <ShieldCheck className="w-3.5 h-3.5" />
-        <span>VERIFIED NOPAY QR</span>
-      </div>
+      {typeBadge && (
+        <div className={`flex items-center gap-1.5 px-3 py-1 ${typeBadge.color} rounded-full text-xs font-bold mb-4`}>
+          <typeBadge.Icon className="w-3.5 h-3.5" />
+          <span>NOPAY {typeBadge.label.toUpperCase()}</span>
+        </div>
+      )}
 
       <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm mb-4">
         <QRCodeSVG

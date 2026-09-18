@@ -5,7 +5,9 @@ import { useRouter, useParams } from 'next/navigation';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { addOfflineTransaction } from '@/offline/queue';
 import { BillQrPayload, Transaction } from '@/types';
-import { Store, Receipt, CreditCard, ArrowLeft, ShieldCheck, WifiOff, FileText, CheckCircle } from 'lucide-react';
+import { readScannedQr } from '@/lib/qr/scanHandoff';
+import { isBillExpired } from '@/lib/status/labels';
+import { CreditCard, ArrowLeft, ShieldCheck, WifiOff } from 'lucide-react';
 
 export default function CustomerBillDetailPage() {
   const router = useRouter();
@@ -13,86 +15,116 @@ export default function CustomerBillDetailPage() {
   const billIdParam = params?.id as string;
   const { isOnline } = useOnlineStatus();
 
-  const [billPayload, setBillPayload] = useState<BillQrPayload | null>(null);
+  const [bill, setBill] = useState<BillQrPayload | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [paying, setPaying] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check session storage first (populated by scanner)
-    const raw = sessionStorage.getItem('nopay_scanned_qr');
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed.type === 'BILL' && parsed.billId === billIdParam) {
-          setBillPayload(parsed as BillQrPayload);
-          setLoading(false);
-          return;
-        }
-      } catch (err) {
-        console.warn('Failed to parse scanned QR session storage', err);
+    const scanned = readScannedQr();
+    if (scanned && scanned.type === 'BILL' && scanned.billId === billIdParam) {
+      if (isBillExpired(scanned.expiresAt)) {
+        setError('Bill Expired');
+        setLoading(false);
+        return;
       }
+      setBill({
+        type: 'BILL',
+        version: 1,
+        transactionId: scanned.transactionId,
+        billId: scanned.billId,
+        merchantId: scanned.merchantId,
+        merchantName: scanned.merchantName,
+        items: scanned.items,
+        subtotal: scanned.subtotal,
+        discount: scanned.discount,
+        tax: scanned.tax,
+        total: scanned.total,
+        createdAt: scanned.createdAt,
+        expiresAt: scanned.expiresAt,
+      });
+      setLoading(false);
+      return;
     }
 
-    // Otherwise fetch online from API if online
     if (isOnline) {
       fetch(`/api/bills/${billIdParam}`)
-        .then((res) => res.json())
-        .then((data) => {
+        .then(async (res) => {
+          const data = await res.json();
+          if (!res.ok) {
+            setError(data.error || 'Bill not found or expired.');
+            return;
+          }
           if (data.bill) {
-            setBillPayload({
+            if (isBillExpired(data.bill.expiresAt)) {
+              setError('Bill Expired');
+              return;
+            }
+            setBill({
               type: 'BILL',
               version: 1,
               transactionId: data.bill.transactionId,
               billId: data.bill.billId,
-              merchantId: data.bill.merchantId,
+              merchantId: String(data.bill.merchantId),
               merchantName: data.bill.merchantName,
               items: data.bill.items,
-              total: data.bill.totalAmount,
+              total: data.bill.total,
               createdAt: data.bill.createdAt,
+              expiresAt: data.bill.expiresAt,
             });
           } else {
             setError('Bill not found or expired.');
           }
         })
-        .catch(() => setError('Failed to fetch bill details.'))
+        .catch(() => setError("You're offline. Scan the Bill QR to view this bill."))
         .finally(() => setLoading(false));
     } else {
-      setError('Offline mode: Please scan the Bill QR code directly to load itemized details.');
+      setError('QR code not recognized. Please scan a valid NoPay Bill QR.');
       setLoading(false);
     }
   }, [billIdParam, isOnline]);
 
   const handlePayBill = async () => {
-    if (!billPayload) return;
+    if (!bill) return;
+    if (isBillExpired(bill.expiresAt)) {
+      setError('Bill Expired');
+      return;
+    }
+
     setPaying(true);
     setError(null);
 
-    const txnId = billPayload.transactionId || `TXN-${Date.now()}`;
-    const idempotencyKey = `IDEM-${txnId}-${billPayload.billId}`;
+    const txnId = bill.transactionId || `TXN-${Date.now()}`;
+    const idempotencyKey = `IDEM-${txnId}-${bill.billId}`;
 
     let customerName = 'Customer';
+    let customerId: string | undefined;
     try {
       const { getLocalSession } = await import('@/offline/session');
       const session = await getLocalSession();
       if (session?.name) customerName = session.name;
-    } catch {}
+      customerId = session?.userId;
+    } catch {
+      // ignore
+    }
 
     const newTxn: Transaction = {
       transactionId: txnId,
-      billId: billPayload.billId,
-      merchantId: billPayload.merchantId,
-      merchantName: billPayload.merchantName,
+      billId: bill.billId,
+      merchantId: bill.merchantId,
+      merchantName: bill.merchantName,
+      customerId,
       customerName,
-      amount: billPayload.total,
+      amount: bill.total,
       type: 'BILL_QR',
       status: 'PENDING_SYNC',
       idempotencyKey,
-      items: billPayload.items.map((i) => ({
+      items: bill.items.map((i) => ({
         name: i.name,
         quantity: i.quantity,
         price: i.price,
       })),
+      offlineCreated: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -102,15 +134,24 @@ export default function CustomerBillDetailPage() {
         const res = await fetch('/api/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transactions: [newTxn] }),
+          body: JSON.stringify(newTxn),
         });
-        if (res.ok) {
-          sessionStorage.setItem('nopay_last_txn', JSON.stringify({ ...newTxn, status: 'CONFIRMED' }));
-          router.push('/customer/payment?status=success');
+        const data = await res.json();
+        if (res.ok && data.success) {
+          sessionStorage.setItem(
+            'nopay_last_txn',
+            JSON.stringify({ ...newTxn, status: 'CONFIRMED' })
+          );
+          router.push('/customer/payment?status=confirmed');
           return;
         }
-      } catch (err) {
-        console.warn('Online pay failed, falling back to offline queueing:', err);
+        if (res.status >= 400 && res.status < 500 && res.status !== 401) {
+          setError(data.error || 'This bill could not be confirmed.');
+          setPaying(false);
+          return;
+        }
+      } catch {
+        // queue offline
       }
     }
 
@@ -118,8 +159,8 @@ export default function CustomerBillDetailPage() {
       await addOfflineTransaction(newTxn);
       sessionStorage.setItem('nopay_last_txn', JSON.stringify(newTxn));
       router.push('/customer/payment?status=queued');
-    } catch (err: any) {
-      setError(err.message || 'Failed to process transaction');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save transaction');
     } finally {
       setPaying(false);
     }
@@ -129,7 +170,7 @@ export default function CustomerBillDetailPage() {
     return (
       <div className="max-w-md mx-auto py-12 text-center space-y-3">
         <div className="w-10 h-10 border-4 border-brand-blue border-t-transparent rounded-full animate-spin mx-auto"></div>
-        <p className="text-xs font-bold text-slate-500">Loading Bill Details...</p>
+        <p className="text-xs font-bold text-slate-500">Loading bill…</p>
       </div>
     );
   }
@@ -144,7 +185,7 @@ export default function CustomerBillDetailPage() {
         <span>Back to QR Scanner</span>
       </button>
 
-      {error ? (
+      {error && !bill ? (
         <div className="bg-red-50 border border-red-200 text-red-700 p-6 rounded-2xl text-center space-y-4">
           <p className="text-sm font-semibold">{error}</p>
           <button
@@ -154,39 +195,43 @@ export default function CustomerBillDetailPage() {
             Scan QR Code Again
           </button>
         </div>
-      ) : billPayload ? (
+      ) : bill ? (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-card overflow-hidden space-y-0">
-          {/* Header */}
           <div className="bg-navy-900 text-white p-6 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-extrabold uppercase tracking-widest text-brand-lightBlue">
-                Itemized Bill Summary
+                Bill QR
               </span>
               <span className="px-2.5 py-1 bg-white/10 text-white text-[10px] font-mono font-bold rounded-full">
-                ID: {billPayload.billId}
+                {bill.billId}
               </span>
             </div>
-            <h2 className="text-2xl font-black text-white">{billPayload.merchantName}</h2>
+            <h2 className="text-2xl font-black text-white">{bill.merchantName}</h2>
             <p className="text-xs text-slate-300">
-              Generated {new Date(billPayload.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              Generated {new Date(bill.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
+
+          {error && (
+            <div className="p-3 bg-rose-50 border-b border-rose-200 text-rose-700 text-xs font-semibold">
+              {error}
+            </div>
+          )}
 
           {!isOnline && (
             <div className="p-3 bg-amber-50 border-b border-amber-200 flex items-center gap-2 text-amber-800 text-xs font-semibold">
               <WifiOff className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>Offline Mode: Payment will be stored locally in Dexie queue and auto-synced.</span>
+              <span>You&apos;re offline. Your transaction has been saved locally and will sync when internet returns.</span>
             </div>
           )}
 
-          {/* Itemized Table */}
           <div className="p-6 space-y-6">
             <div className="border border-slate-100 rounded-2xl overflow-hidden divide-y divide-slate-100">
               <div className="bg-slate-50 px-4 py-2.5 flex justify-between text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
                 <span>Item & Qty</span>
                 <span>Amount</span>
               </div>
-              {billPayload.items.map((item, idx) => (
+              {bill.items.map((item, idx) => (
                 <div key={idx} className="px-4 py-3 flex items-center justify-between text-xs">
                   <div>
                     <p className="font-bold text-navy-900">{item.name}</p>
@@ -201,37 +246,47 @@ export default function CustomerBillDetailPage() {
               ))}
             </div>
 
-            {/* Total Calculation */}
             <div className="bg-blue-50/60 p-4 rounded-2xl border border-blue-100 space-y-2">
               <div className="flex justify-between items-center text-xs text-slate-600 font-semibold">
-                <span>Subtotal ({billPayload.items.length} items)</span>
-                <span>₹{billPayload.total.toFixed(2)}</span>
+                <span>Subtotal ({bill.items.length} items)</span>
+                <span>₹{(bill.subtotal ?? bill.total).toFixed(2)}</span>
               </div>
+              {!!bill.discount && (
+                <div className="flex justify-between items-center text-xs text-slate-600 font-semibold">
+                  <span>Discount</span>
+                  <span>-₹{bill.discount.toFixed(2)}</span>
+                </div>
+              )}
+              {!!bill.tax && (
+                <div className="flex justify-between items-center text-xs text-slate-600 font-semibold">
+                  <span>Tax</span>
+                  <span>₹{bill.tax.toFixed(2)}</span>
+                </div>
+              )}
               <div className="flex justify-between items-center text-sm font-black text-navy-900 pt-2 border-t border-blue-200/60">
                 <span>Total Amount Due</span>
-                <span className="text-2xl text-brand-blue">₹{billPayload.total.toFixed(2)}</span>
+                <span className="text-2xl text-brand-blue">₹{bill.total.toFixed(2)}</span>
               </div>
             </div>
 
-            {/* CTA Button */}
             <button
               onClick={handlePayBill}
               disabled={paying}
               className="w-full py-4 bg-brand-blue hover:bg-brand-darkBlue text-white font-black rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base"
             >
               {paying ? (
-                <span>Processing Payment...</span>
+                <span>Saving…</span>
               ) : (
                 <>
                   <CreditCard className="w-5 h-5" />
-                  <span>Pay Bill ₹{billPayload.total.toFixed(2)}</span>
+                  <span>Confirm ₹{bill.total.toFixed(2)}</span>
                 </>
               )}
             </button>
 
             <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 font-semibold">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Verified Itemized Bill Payment</span>
+              <span>Saved Offline — will sync when internet returns</span>
             </div>
           </div>
         </div>

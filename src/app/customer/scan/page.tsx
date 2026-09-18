@@ -3,20 +3,21 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { QrScannerModal } from '@/components/qr/QrScannerModal';
-import { DecodedQrPayload } from '@/types';
+import { NoPayQrResult } from '@/lib/qr/payload';
+import { storeScannedQrRaw } from '@/lib/qr/scanHandoff';
 import { QrCode, ArrowLeft } from 'lucide-react';
 
 export default function CustomerScanPage() {
   const router = useRouter();
   const [scannerOpen, setScannerOpen] = useState(true);
 
-  const handleScanSuccess = (payload: DecodedQrPayload, rawText: string) => {
-    sessionStorage.setItem('nopay_scanned_qr', JSON.stringify(payload));
+  const handleScanSuccess = (result: NoPayQrResult, rawText: string) => {
+    storeScannedQrRaw(rawText);
 
-    if (payload.type === 'MERCHANT') {
+    if (result.type === 'MERCHANT') {
       router.push('/customer/static-pay');
-    } else if (payload.type === 'BILL') {
-      router.push(`/customer/bill/${payload.billId}`);
+    } else {
+      router.push(`/customer/bill/${result.billId}`);
     }
   };
 
@@ -43,7 +44,7 @@ export default function CustomerScanPage() {
           onClick={() => setScannerOpen(true)}
           className="w-full py-3.5 bg-brand-blue hover:bg-brand-darkBlue text-white font-bold rounded-xl shadow-md transition-all text-sm"
         >
-          Open Scanner Camera
+          Open Camera
         </button>
       </div>
 

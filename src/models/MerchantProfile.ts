@@ -7,6 +7,7 @@ export interface IMerchantProfile extends Document {
   area: string;
   staticQrPayload: string;
   version: number;
+  active: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -19,6 +20,7 @@ const MerchantProfileSchema = new Schema<IMerchantProfile>(
     area: { type: String, required: true, trim: true },
     staticQrPayload: { type: String, required: true },
     version: { type: Number, default: 1 },
+    active: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

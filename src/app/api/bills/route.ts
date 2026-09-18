@@ -1,30 +1,25 @@
 import { NextResponse } from 'next/server';
-import { getSessionUser } from '@/lib/auth/jwt';
+import { getRequiredMerchantSession, authErrorResponse } from '@/lib/auth/apiGuards';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { Bill } from '@/models/Bill';
 import { Product } from '@/models/Product';
 import { MerchantProfile } from '@/models/MerchantProfile';
 import { CreateBillSchema } from '@/lib/validation/schemas';
-import { encodeBillQrPayload } from '@/lib/qr/payload';
+import { encodeBillQr } from '@/lib/qr/payload';
 
 export async function POST(req: Request) {
-  const session = await getSessionUser();
-  if (!session || !session.merchantProfileId || session.activeRole !== 'MERCHANT') {
-    return NextResponse.json({ error: 'Merchant authorization required' }, { status: 403 });
-  }
-
   try {
+    const session = await getRequiredMerchantSession();
     const body = await req.json();
     const validated = CreateBillSchema.parse(body);
 
     await connectToDatabase();
 
     const merchant = await MerchantProfile.findById(session.merchantProfileId);
-    if (!merchant) {
+    if (!merchant || merchant.active === false) {
       return NextResponse.json({ error: 'Merchant profile not found' }, { status: 404 });
     }
 
-    // SERVER-SIDE RE-VALIDATION OF ITEMS & TOTALS
     let calculatedSubtotal = 0;
     const validatedItems = [];
 
@@ -32,15 +27,16 @@ export async function POST(req: Request) {
       let unitPrice = item.price;
 
       if (item.productId) {
-        const product = await Product.findById(item.productId);
+        const product = await Product.findOne({
+          _id: item.productId,
+          merchantId: session.merchantProfileId,
+        });
         if (product) {
-          unitPrice = product.price; // Enforce authoritative server price
+          unitPrice = product.price;
         }
       }
 
-      const itemTotal = unitPrice * item.quantity;
-      calculatedSubtotal += itemTotal;
-
+      calculatedSubtotal += unitPrice * item.quantity;
       validatedItems.push({
         productId: item.productId,
         name: item.name,
@@ -53,12 +49,31 @@ export async function POST(req: Request) {
     const discount = Math.min(validated.discount, subtotal);
     const tax = Math.max(0, validated.tax);
     const calculatedTotal = Math.max(0, subtotal - discount + tax);
+    const expiresAt = validated.expiresAt
+      ? new Date(validated.expiresAt)
+      : new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    const billId = `BILL-${Math.floor(1000 + Math.random() * 9000)}`;
-    const transactionId = `TXN-${Date.now().toString(36).toUpperCase()}`;
+    const billId =
+      validated.billId?.trim() ||
+      `BILL-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const transactionId =
+      validated.transactionId?.trim() || `TXN-${Date.now().toString(36).toUpperCase()}`;
+
+    const existing = await Bill.findOne({ billId });
+    if (existing) {
+      if (String(existing.merchantId) !== String(session.merchantProfileId)) {
+        return NextResponse.json({ error: 'Bill ID is already in use' }, { status: 409 });
+      }
+      return NextResponse.json({
+        message: 'Bill already exists',
+        bill: existing,
+        transactionId: existing.transactionId,
+      });
+    }
 
     const newBill = await Bill.create({
       billId,
+      transactionId,
       merchantId: session.merchantProfileId,
       merchantName: merchant.shopName,
       items: validatedItems,
@@ -67,32 +82,40 @@ export async function POST(req: Request) {
       tax,
       total: calculatedTotal,
       status: 'CREATED',
+      expiresAt,
     });
 
-    const qrPayload = encodeBillQrPayload({
-      type: 'BILL',
-      version: 1,
-      transactionId,
+    const qrValue = encodeBillQr({
       billId,
-      merchantId: session.merchantProfileId,
+      transactionId,
+      merchantId: session.merchantProfileId as string,
       merchantName: merchant.shopName,
       items: validatedItems,
       subtotal,
       discount,
       tax,
       total: calculatedTotal,
-      createdAt: newBill.createdAt.toISOString(),
+      expiresAt: expiresAt.toISOString(),
     });
 
-    return NextResponse.json({
-      message: 'Bill created and validated successfully',
-      bill: newBill,
-      qrPayload,
-      transactionId,
-    }, { status: 201 });
-  } catch (err: any) {
-    if (err.name === 'ZodError') {
-      return NextResponse.json({ error: err.errors[0].message }, { status: 400 });
+    return NextResponse.json(
+      {
+        message: 'Bill created',
+        bill: newBill,
+        qrValue,
+        transactionId,
+      },
+      { status: 201 }
+    );
+  } catch (err: unknown) {
+    if (typeof err === 'object' && err && 'statusCode' in err) {
+      return authErrorResponse(err);
+    }
+    if (typeof err === 'object' && err && (err as { name?: string }).name === 'ZodError') {
+      return NextResponse.json(
+        { error: (err as { errors: { message: string }[] }).errors[0].message },
+        { status: 400 }
+      );
     }
     console.error('Create Bill Error:', err);
     return NextResponse.json({ error: 'Failed to create bill' }, { status: 500 });

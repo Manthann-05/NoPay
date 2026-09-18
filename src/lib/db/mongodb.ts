@@ -1,10 +1,5 @@
 import mongoose from 'mongoose';
-
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/nopay_db';
-
-if (!MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI environment variable inside .env.local');
-}
+import { getEnv } from '@/lib/env';
 
 /**
  * Global is used here to maintain a cached connection across hot reloads in development.
@@ -31,18 +26,16 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
     return cached.conn;
   }
 
+  const { MONGODB_URI } = getEnv();
+
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
     };
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongooseInstance) => {
-      console.log('✅ Connected to MongoDB successfully.');
-      return mongooseInstance;
-    }).catch((err) => {
-      console.warn('⚠️ MongoDB Connection Notice (will retry on active database request):', err.message);
-      throw err;
-    });
+    cached.promise = mongoose
+      .connect(MONGODB_URI, opts)
+      .then((mongooseInstance) => mongooseInstance);
   }
 
   try {

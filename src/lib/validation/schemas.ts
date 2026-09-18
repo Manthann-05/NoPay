@@ -38,9 +38,14 @@ export const BillItemSchema = z.object({
 });
 
 export const CreateBillSchema = z.object({
+  billId: z.string().min(1).optional(),
+  transactionId: z.string().min(1).optional(),
   items: z.array(BillItemSchema).min(1, 'At least one item is required'),
   discount: z.number().min(0).default(0),
   tax: z.number().min(0).default(0),
+  subtotal: z.number().min(0).optional(),
+  totalAmount: z.number().min(0).optional(),
+  expiresAt: z.string().optional(),
 });
 
 export const TransactionSyncSchema = z.object({

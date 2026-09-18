@@ -6,7 +6,10 @@ import { useRouter } from 'next/navigation';
 import { QrCode, History, RefreshCw, Smartphone, Store, ShieldCheck, ArrowRight, Zap, CheckCircle2, Clock } from 'lucide-react';
 import { QrScannerModal } from '@/components/qr/QrScannerModal';
 import { getAllLocalTransactions } from '@/offline/queue';
-import { DecodedQrPayload, Transaction } from '@/types';
+import { NoPayQrResult } from '@/lib/qr/payload';
+import { storeScannedQrRaw } from '@/lib/qr/scanHandoff';
+import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
+import { Transaction } from '@/types';
 
 export default function CustomerDashboardPage() {
   const router = useRouter();
@@ -52,14 +55,14 @@ export default function CustomerDashboardPage() {
     loadData();
   }, []);
 
-  const handleQrDetected = (payload: DecodedQrPayload, rawText: string) => {
+  const handleQrDetected = (result: NoPayQrResult, rawText: string) => {
     setScannerOpen(false);
-    sessionStorage.setItem('nopay_scanned_qr', JSON.stringify(payload));
+    storeScannedQrRaw(rawText);
 
-    if (payload.type === 'MERCHANT') {
+    if (result.type === 'MERCHANT') {
       router.push('/customer/static-pay');
-    } else if (payload.type === 'BILL') {
-      router.push(`/customer/bill/${payload.billId}`);
+    } else {
+      router.push(`/customer/bill/${result.billId}`);
     }
   };
 
@@ -92,9 +95,9 @@ export default function CustomerDashboardPage() {
         </div>
 
         <div>
-          <h2 className="text-xl font-black text-navy-900">Scan QR Code</h2>
+          <h2 className="text-xl font-black text-navy-900">Scan QR</h2>
           <p className="text-xs text-slate-500 mt-1">
-            Auto-detects Merchant QR or Itemized Bill QR
+            Scan a Merchant QR or Bill QR
           </p>
         </div>
 
@@ -103,7 +106,7 @@ export default function CustomerDashboardPage() {
           className="w-full py-4 bg-brand-blue hover:bg-brand-darkBlue text-white font-extrabold text-base rounded-2xl shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
         >
           <QrCode className="w-5 h-5" />
-          <span>Launch Camera Scanner</span>
+          <span>Open Camera</span>
         </button>
       </div>
 
@@ -145,21 +148,11 @@ export default function CustomerDashboardPage() {
                 <div className="text-right">
                   <div className="text-sm font-black text-navy-900">₹{txn.amount}</div>
                   <span
-                    className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      txn.status === 'CONFIRMED' || txn.status === 'SYNCED'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : txn.status === 'PENDING_SYNC'
-                        ? 'bg-amber-100 text-amber-900'
-                        : txn.status === 'RETRY_PENDING'
-                        ? 'bg-rose-100 text-rose-900'
-                        : 'bg-slate-200 text-slate-700'
-                    }`}
+                    className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${transactionStatusTone(
+                      txn.status
+                    )}`}
                   >
-                    {txn.status === 'PENDING_SYNC'
-                      ? 'Pending Sync'
-                      : txn.status === 'RETRY_PENDING'
-                      ? 'Retry Pending'
-                      : txn.status}
+                    {transactionStatusLabel(txn.status)}
                   </span>
                 </div>
               </div>

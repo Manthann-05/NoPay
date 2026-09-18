@@ -1,234 +1,296 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
-import { parseQrPayload } from '@/lib/qr/payload';
-import { DecodedQrPayload } from '@/types';
-import { Camera, X, RefreshCw, Type, AlertCircle, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { parseNoPayQr, NoPayQrResult } from '@/lib/qr/payload';
+import { Image as ImageIcon, AlertCircle, QrCode, X } from 'lucide-react';
 
 interface QrScannerModalProps {
-  onScanSuccess: (payload: DecodedQrPayload, rawText: string) => void;
+  onScanSuccess: (result: NoPayQrResult, rawText: string) => void;
   onClose: () => void;
 }
 
+const READER_ELEMENT_ID = 'nopay-qr-reader';
+const IMAGE_READER_ID = 'nopay-qr-image-reader';
+
+function stopVideoTracks(elementId: string) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  el.querySelectorAll('video').forEach((video) => {
+    const stream = video.srcObject as MediaStream | null;
+    stream?.getTracks().forEach((track) => track.stop());
+    video.srcObject = null;
+  });
+}
+
 export function QrScannerModal({ onScanSuccess, onClose }: QrScannerModalProps) {
-  const [activeTab, setActiveTab] = useState<'camera' | 'manual'>('camera');
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [manualInput, setManualInput] = useState<string>('');
-  const [manualError, setManualError] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(true);
+  const [scanStatus, setScanStatus] = useState<string>('Pointing at QR code…');
+  const [imageError, setImageError] = useState<string | null>(null);
+
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const hasScannedRef = useRef(false);
+  const isCleaningUpRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const onScanSuccessRef = useRef(onScanSuccess);
+  onScanSuccessRef.current = onScanSuccess;
 
-  useEffect(() => {
-    let isMounted = true;
-
-    if (activeTab === 'camera') {
-      const html5QrCode = new Html5Qrcode('reader');
-      scannerRef.current = html5QrCode;
-
-      const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-
-      html5QrCode
-        .start(
-          { facingMode: 'environment' },
-          config,
-          (decodedText) => {
-            const parsed = parseQrPayload(decodedText);
-            if (parsed) {
-              if (scannerRef.current && scannerRef.current.isScanning) {
-                scannerRef.current.stop().catch(console.error);
-              }
-              onScanSuccess(parsed, decodedText);
-            } else {
-              setCameraError('Unrecognized QR format. Please scan a valid NoPay Merchant or Bill QR.');
-            }
-          },
-          () => {}
-        )
-        .catch((err) => {
-          if (isMounted) {
-            setCameraError('Unable to access device camera. Please allow camera permissions or use manual entry below.');
+  const stopCamera = useCallback(async () => {
+    if (isCleaningUpRef.current) return;
+    isCleaningUpRef.current = true;
+    try {
+      const scanner = scannerRef.current;
+      if (scanner) {
+        try {
+          if (scanner.isScanning) {
+            await scanner.stop();
           }
-        });
-    }
-
-    return () => {
-      isMounted = false;
-      if (scannerRef.current && scannerRef.current.isScanning) {
-        scannerRef.current.stop().catch(console.error);
+        } catch {
+          // already stopped
+        }
+        try {
+          scanner.clear();
+        } catch {
+          // ignore
+        }
+        scannerRef.current = null;
       }
-    };
-  }, [activeTab]);
+      stopVideoTracks(READER_ELEMENT_ID);
+    } finally {
+      isCleaningUpRef.current = false;
+    }
+  }, []);
 
-  const handleManualSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setManualError(null);
+  const startCamera = useCallback(async () => {
+    setIsStarting(true);
+    setCameraError(null);
+    hasScannedRef.current = false;
 
-    const parsed = parseQrPayload(manualInput);
-    if (!parsed) {
-      setManualError('Invalid QR payload string. Please verify the JSON string structure.');
+    await new Promise((r) => setTimeout(r, 150));
+    if (!isMountedRef.current) return;
+
+    const element = document.getElementById(READER_ELEMENT_ID);
+    if (!element) {
+      setCameraError('Camera container not found. Please try again.');
+      setIsStarting(false);
       return;
     }
 
-    onScanSuccess(parsed, manualInput);
-  };
+    try {
+      const html5QrCode = new Html5Qrcode(READER_ELEMENT_ID, {
+        verbose: false,
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+      });
+      scannerRef.current = html5QrCode;
 
-  const handleLoadSampleMerchant = () => {
-    const sample = JSON.stringify({
-      type: 'MERCHANT',
-      version: 1,
-      merchantId: 'SHOP123',
-      merchantName: 'ABC General Store',
-    });
-    setManualInput(sample);
-  };
+      await html5QrCode.start(
+        { facingMode: 'environment' },
+        {
+          fps: 12,
+          qrbox: (viewfinderWidth, viewfinderHeight) => {
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight, window.innerWidth);
+            const size = Math.max(140, Math.min(Math.floor(minEdge * 0.72), 280));
+            return { width: size, height: size };
+          },
+          aspectRatio: 1.0,
+        },
+        (decodedText) => {
+          if (hasScannedRef.current) return;
 
-  const handleLoadSampleBill = () => {
-    const sample = JSON.stringify({
-      type: 'BILL',
-      version: 1,
-      transactionId: `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
-      billId: 'BILL-4587',
-      merchantId: 'SHOP123',
-      merchantName: 'ABC General Store',
-      items: [
-        { name: 'Milk 1L', quantity: 2, price: 60 },
-        { name: 'Bread', quantity: 1, price: 40 },
-        { name: 'Chips', quantity: 2, price: 20 },
-      ],
-      subtotal: 200,
-      discount: 0,
-      tax: 0,
-      total: 200,
-      createdAt: new Date().toISOString(),
-    });
-    setManualInput(sample);
+          const result = parseNoPayQr(decodedText);
+          if (result) {
+            hasScannedRef.current = true;
+            setScanStatus('NoPay QR detected');
+            stopCamera().then(() => {
+              if (isMountedRef.current) {
+                onScanSuccessRef.current(result, decodedText);
+              }
+            });
+          } else {
+            setScanStatus('QR not recognized — point at a NoPay Merchant or Bill QR');
+          }
+        },
+        () => {
+          // frame decode failure
+        }
+      );
+
+      if (isMountedRef.current) {
+        setIsStarting(false);
+        setScanStatus('Point camera at a NoPay QR code');
+      }
+    } catch (err: unknown) {
+      if (!isMountedRef.current) return;
+      setIsStarting(false);
+
+      const msg = String(err instanceof Error ? err.message : err || '');
+      if (
+        msg.includes('Permission') ||
+        msg.includes('permission') ||
+        msg.includes('NotAllowed') ||
+        msg.includes('denied')
+      ) {
+        setCameraError(
+          'Camera permission was denied. Please allow camera access in your browser settings and try again.'
+        );
+      } else if (msg.includes('NotFound') || msg.includes('no camera')) {
+        setCameraError('No camera found on this device. Please use Scan from Image below.');
+      } else {
+        setCameraError(
+          'Unable to start the camera. Please check your browser settings or use Scan from Image.'
+        );
+      }
+    }
+  }, [stopCamera]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    void startCamera();
+
+    return () => {
+      isMountedRef.current = false;
+      void stopCamera();
+    };
+    // start once per modal mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleClose = useCallback(async () => {
+    await stopCamera();
+    onClose();
+  }, [stopCamera, onClose]);
+
+  const handleImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setImageError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    await stopCamera();
+
+    try {
+      const scanner = new Html5Qrcode(IMAGE_READER_ID, {
+        verbose: false,
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+      });
+      try {
+        const result = await scanner.scanFile(file, false);
+        const parsed = parseNoPayQr(result);
+        if (parsed) {
+          onScanSuccessRef.current(parsed, result);
+        } else {
+          setImageError('QR code not recognized. Please scan a valid NoPay QR.');
+          if (isMountedRef.current) {
+            void startCamera();
+          }
+        }
+      } finally {
+        try {
+          scanner.clear();
+        } catch {
+          // ignore
+        }
+      }
+    } catch {
+      setImageError('No QR code found in this image. Please try a clearer photo.');
+      if (isMountedRef.current) {
+        void startCamera();
+      }
+    }
+
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-md animate-fade-in">
       <div className="relative w-full max-w-md bg-white rounded-3xl shadow-modal overflow-hidden border border-slate-200">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
           <div className="flex items-center gap-2">
-            <Camera className="w-5 h-5 text-brand-blue" />
-            <h3 className="font-bold text-base">NoPay QR Scanner</h3>
+            <QrCode className="w-5 h-5 text-brand-blue" />
+            <h3 className="font-bold text-base">Scan QR</h3>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-1 text-slate-400 hover:text-white rounded-lg transition-colors"
+            aria-label="Close scanner"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Tab Toggle */}
-        <div className="flex border-b border-slate-200 bg-slate-50 p-1">
-          <button
-            onClick={() => setActiveTab('camera')}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
-              activeTab === 'camera'
-                ? 'bg-white text-navy-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            Camera Scanner
-          </button>
-          <button
-            onClick={() => setActiveTab('manual')}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
-              activeTab === 'manual'
-                ? 'bg-white text-navy-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            Manual Entry (Test)
-          </button>
-        </div>
+        <div className="p-6 space-y-4">
+          <div className="flex flex-col items-center">
+            <div className="relative w-full max-w-[300px] aspect-square rounded-2xl overflow-hidden bg-slate-900 border-2 border-brand-blue flex items-center justify-center mx-auto">
+              <div id={READER_ELEMENT_ID} className="w-full h-full" />
 
-        {/* Content */}
-        <div className="p-6">
-          {activeTab === 'camera' ? (
-            <div className="flex flex-col items-center">
-              <div className="relative w-full max-w-[280px] h-[280px] rounded-2xl overflow-hidden bg-slate-900 border-2 border-brand-blue flex items-center justify-center">
-                <div id="reader" className="w-full h-full"></div>
-
-                {/* Scanning Frame Overlay */}
-                <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-brand-blue/60 rounded-2xl m-6"></div>
-              </div>
-
-              {cameraError && (
-                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-semibold">{cameraError}</p>
-                    <button
-                      onClick={() => setActiveTab('manual')}
-                      className="mt-1 text-brand-blue font-bold underline cursor-pointer"
-                    >
-                      Switch to Manual Entry
-                    </button>
-                  </div>
+              {!cameraError && (
+                <div className="absolute inset-0 pointer-events-none">
+                  <div className="absolute top-3 left-3 w-6 h-6 border-t-2 border-l-2 border-brand-blue rounded-tl-sm" />
+                  <div className="absolute top-3 right-3 w-6 h-6 border-t-2 border-r-2 border-brand-blue rounded-tr-sm" />
+                  <div className="absolute bottom-3 left-3 w-6 h-6 border-b-2 border-l-2 border-brand-blue rounded-bl-sm" />
+                  <div className="absolute bottom-3 right-3 w-6 h-6 border-b-2 border-r-2 border-brand-blue rounded-br-sm" />
                 </div>
               )}
 
-              <p className="text-xs text-slate-500 mt-4 text-center">
-                Point your camera at a NoPay Merchant QR or Bill QR. Type will be automatically detected offline.
-              </p>
+              {isStarting && !cameraError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-900">
+                  <div className="w-8 h-8 border-3 border-brand-blue border-t-transparent rounded-full animate-spin" />
+                  <p className="text-xs text-slate-400 font-medium">Starting camera…</p>
+                </div>
+              )}
             </div>
-          ) : (
-            <form onSubmit={handleManualSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Paste / Enter QR Payload JSON:
-                </label>
-                <textarea
-                  rows={5}
-                  value={manualInput}
-                  onChange={(e) => setManualInput(e.target.value)}
-                  placeholder='{"type":"MERCHANT","merchantId":"SHOP123",...}'
-                  className="w-full p-3 text-xs font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-blue focus:border-brand-blue outline-none"
-                />
+
+            {!cameraError && !isStarting && (
+              <p className="text-xs text-slate-500 mt-3 text-center font-medium">{scanStatus}</p>
+            )}
+
+            {cameraError && (
+              <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-start gap-2 w-full">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <p className="font-medium">{cameraError}</p>
               </div>
+            )}
+          </div>
 
-              {manualError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-medium">
-                  {manualError}
-                </div>
-              )}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-slate-200" />
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">or</span>
+            <div className="flex-1 h-px bg-slate-200" />
+          </div>
 
-              {/* Sample Test Data Helpers */}
-              <div className="space-y-2 pt-2">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                  Quick Load Test Payloads:
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleLoadSampleMerchant}
-                    className="flex-1 py-1.5 px-2 bg-slate-100 hover:bg-blue-50 hover:text-brand-blue border border-slate-200 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1"
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    <span>Static Merchant</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleLoadSampleBill}
-                    className="flex-1 py-1.5 px-2 bg-slate-100 hover:bg-blue-50 hover:text-brand-blue border border-slate-200 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1"
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    <span>Bill QR (₹200)</span>
-                  </button>
-                </div>
+          <div>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full py-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-brand-blue text-slate-700 hover:text-brand-blue font-semibold text-sm rounded-xl transition-all flex items-center justify-center gap-2"
+            >
+              <ImageIcon className="w-4 h-4" />
+              <span>Scan from Image</span>
+            </button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageFile}
+              aria-label="Select QR code image"
+            />
+
+            <div id={IMAGE_READER_ID} className="hidden" />
+
+            {imageError && (
+              <div className="mt-2 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                <p className="font-medium">{imageError}</p>
               </div>
+            )}
 
-              <button
-                type="submit"
-                className="w-full py-3 bg-brand-blue hover:bg-brand-darkBlue text-white font-bold text-sm rounded-xl shadow-md transition-all mt-4"
-              >
-                Decode & Continue
-              </button>
-            </form>
-          )}
+            <p className="text-[11px] text-slate-400 text-center mt-2">
+              Use a screenshot, photo, or saved image of a NoPay QR
+            </p>
+          </div>
         </div>
       </div>
     </div>

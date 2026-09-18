@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { QrCodeGenerator } from '@/components/qr/QrCodeGenerator';
-import { QrScannerModal } from '@/components/qr/QrScannerModal';
-import { Product, BillItem, DecodedQrPayload } from '@/types';
-import { encodeBillQrPayload } from '@/lib/qr/payload';
+import { BarcodeScanner } from '@/components/qr/BarcodeScanner';
+import { Product, BillItem } from '@/types';
+import { encodeBillQr } from '@/lib/qr/payload';
 import {
   Search,
   ShoppingCart,
@@ -13,26 +13,11 @@ import {
   Minus,
   Trash2,
   QrCode,
-  CheckCircle2,
   Scan,
-  Percent,
-  Tag,
-  Store,
-  DollarSign,
   X,
-  CreditCard,
   Printer,
-  Sparkles,
+  PackageX,
 } from 'lucide-react';
-
-const MOCK_PRODUCTS: Product[] = [
-  { _id: 'p1', merchantId: 'm1', name: 'Fresh Milk 1L', price: 60, stock: 45, category: 'Dairy', barcode: '8901234567890', active: true, createdAt: '', updatedAt: '' },
-  { _id: 'p2', merchantId: 'm1', name: 'Whole Wheat Bread', price: 45, stock: 20, category: 'Bakery', barcode: '8901234567891', active: true, createdAt: '', updatedAt: '' },
-  { _id: 'p3', merchantId: 'm1', name: 'Potato Chips 100g', price: 30, stock: 80, category: 'Snacks', barcode: '8901234567892', active: true, createdAt: '', updatedAt: '' },
-  { _id: 'p4', merchantId: 'm1', name: 'Sparkling Soda 500ml', price: 40, stock: 35, category: 'Beverages', barcode: '8901234567893', active: true, createdAt: '', updatedAt: '' },
-  { _id: 'p5', merchantId: 'm1', name: 'Instant Coffee 100g', price: 180, stock: 15, category: 'Pantry', barcode: '8901234567894', active: true, createdAt: '', updatedAt: '' },
-  { _id: 'p6', merchantId: 'm1', name: 'Dark Chocolate Bar', price: 95, stock: 50, category: 'Snacks', barcode: '8901234567895', active: true, createdAt: '', updatedAt: '' },
-];
 
 interface CartItem extends BillItem {
   id: string;
@@ -41,7 +26,8 @@ interface CartItem extends BillItem {
 
 export default function MerchantPosBillingPage() {
   const router = useRouter();
-  const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingCatalog, setLoadingCatalog] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
 
@@ -59,7 +45,6 @@ export default function MerchantPosBillingPage() {
   const [qrPayload, setQrPayload] = useState<string>('');
   const [generatedBillId, setGeneratedBillId] = useState<string>('');
   const [scannerOpen, setScannerOpen] = useState<boolean>(false);
-  const [checkoutSuccess, setCheckoutSuccess] = useState<boolean>(false);
 
   // Merchant session
   const [merchantInfo, setMerchantInfo] = useState<{ merchantId: string; shopName: string }>({
@@ -69,6 +54,7 @@ export default function MerchantPosBillingPage() {
 
   useEffect(() => {
     async function initCatalogAndSession() {
+      setLoadingCatalog(true);
       try {
         const { offlineDb } = await import('@/offline/db');
         const { getLocalSession } = await import('@/offline/session');
@@ -86,10 +72,6 @@ export default function MerchantPosBillingPage() {
         const localProducts = await offlineDb.products.toArray();
         if (localProducts.length > 0) {
           setProducts(localProducts);
-        } else {
-          // Seed local IndexedDB with default mock products
-          await offlineDb.products.bulkPut(MOCK_PRODUCTS);
-          setProducts(MOCK_PRODUCTS);
         }
 
         // 3. If online, fetch updated products from server and cache to Dexie
@@ -110,6 +92,8 @@ export default function MerchantPosBillingPage() {
         }
       } catch (err) {
         console.warn('Error initializing POS catalog:', err);
+      } finally {
+        setLoadingCatalog(false);
       }
     }
 
@@ -191,8 +175,9 @@ export default function MerchantPosBillingPage() {
   const handleGenerateBillQr = async () => {
     if (cart.length === 0) return;
 
-    const billId = `BILL-${Math.floor(1000 + Math.random() * 9000)}`;
+    const billId = `BILL-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
     const transactionId = `TXN-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     const itemsPayload = cart.map((item) => ({
       name: item.name,
@@ -200,20 +185,24 @@ export default function MerchantPosBillingPage() {
       price: item.price,
     }));
 
-    const encoded = encodeBillQrPayload({
+    const encoded = encodeBillQr({
       transactionId,
       billId,
       merchantId: merchantInfo.merchantId,
       merchantName: merchantInfo.shopName,
       items: itemsPayload,
+      subtotal,
+      discount,
+      tax: taxAmount,
       total: grandTotal,
+      expiresAt,
     });
 
     setGeneratedBillId(billId);
     setQrPayload(encoded);
     setQrModalOpen(true);
 
-    // Save bill to local Dexie bills table (offline-first)
+    // Save bill to local offline bills table
     try {
       const { offlineDb } = await import('@/offline/db');
       await offlineDb.bills.put({
@@ -228,9 +217,10 @@ export default function MerchantPosBillingPage() {
         total: grandTotal,
         status: 'PENDING',
         createdAt: new Date().toISOString(),
+        expiresAt,
       });
     } catch (dbErr) {
-      console.warn('Failed to save bill to local Dexie DB:', dbErr);
+      console.warn('Failed to save bill to local offline DB:', dbErr);
     }
 
     // If online, also post to API asynchronously
@@ -246,14 +236,16 @@ export default function MerchantPosBillingPage() {
           discount,
           tax: taxAmount,
           totalAmount: grandTotal,
+          expiresAt,
         }),
-      }).catch((err) => console.warn('Saved local offline bill QR payload', err));
+      }).catch(() => {
+        // bill is already stored locally
+      });
     }
   };
 
-  const handleBarcodeScanSuccess = (payload: DecodedQrPayload, rawText: string) => {
+  const handleBarcodeDetected = (rawText: string) => {
     setScannerOpen(false);
-    // Find product matching barcode
     const match = products.find((p) => p.barcode === rawText || p._id === rawText);
     if (match) {
       addToCart(match);
@@ -297,52 +289,69 @@ export default function MerchantPosBillingPage() {
             </div>
 
             {/* Category Filter Pills */}
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
-                    selectedCategory === cat
-                      ? 'bg-navy-900 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
+            {categories.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+                      selectedCategory === cat
+                        ? 'bg-navy-900 text-white shadow-sm'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Products Grid or Empty Catalog State */}
+          {loadingCatalog ? (
+            <div className="p-12 text-center bg-white rounded-3xl border border-slate-200">
+              <div className="w-8 h-8 border-3 border-brand-blue border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              <p className="text-xs text-slate-400">Loading product catalog…</p>
+            </div>
+          ) : products.length === 0 ? (
+            <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 space-y-3">
+              <PackageX className="w-12 h-12 text-slate-300 mx-auto" />
+              <h3 className="text-sm font-bold text-navy-900">No Products Cached Offline</h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                Connect to internet to sync your store catalog, or add custom items below.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {filteredProducts.map((p) => (
+                <div
+                  key={p._id}
+                  onClick={() => addToCart(p)}
+                  className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-brand-blue hover:shadow-md cursor-pointer transition-all space-y-3 flex flex-col justify-between group"
                 >
-                  {cat}
-                </button>
+                  <div>
+                    <div className="flex justify-between items-start gap-1">
+                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md">
+                        {p.category || 'General'}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400">Stock: {p.stock}</span>
+                    </div>
+                    <h4 className="text-xs font-black text-navy-900 mt-2 group-hover:text-brand-blue transition-colors line-clamp-2">
+                      {p.name}
+                    </h4>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <span className="text-base font-black text-navy-900">₹{p.price.toFixed(2)}</span>
+                    <div className="w-7 h-7 bg-blue-50 text-brand-blue rounded-lg flex items-center justify-center font-black group-hover:bg-brand-blue group-hover:text-white transition-colors">
+                      +
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
-          </div>
-
-          {/* Products Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            {filteredProducts.map((p) => (
-              <div
-                key={p._id}
-                onClick={() => addToCart(p)}
-                className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-brand-blue hover:shadow-md cursor-pointer transition-all space-y-3 flex flex-col justify-between group"
-              >
-                <div>
-                  <div className="flex justify-between items-start gap-1">
-                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md">
-                      {p.category || 'General'}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-400">Stock: {p.stock}</span>
-                  </div>
-                  <h4 className="text-xs font-black text-navy-900 mt-2 group-hover:text-brand-blue transition-colors line-clamp-2">
-                    {p.name}
-                  </h4>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                  <span className="text-base font-black text-navy-900">₹{p.price.toFixed(2)}</span>
-                  <div className="w-7 h-7 bg-blue-50 text-brand-blue rounded-lg flex items-center justify-center font-black group-hover:bg-brand-blue group-hover:text-white transition-colors">
-                    +
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          )}
         </div>
 
         {/* RIGHT COLUMN: Live Active POS Cart */}
@@ -501,7 +510,7 @@ export default function MerchantPosBillingPage() {
             </div>
 
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 inline-block mx-auto">
-              <QrCodeGenerator value={qrPayload} size={220} title="Itemized Bill QR" />
+              <QrCodeGenerator value={qrPayload} size={220} qrType="BILL" />
             </div>
 
             <div className="flex gap-2">
@@ -528,11 +537,12 @@ export default function MerchantPosBillingPage() {
 
       {/* Barcode Scanner Modal */}
       {scannerOpen && (
-        <QrScannerModal
-          onScanSuccess={handleBarcodeScanSuccess}
+        <BarcodeScanner
+          onDetected={handleBarcodeDetected}
           onClose={() => setScannerOpen(false)}
         />
       )}
     </div>
   );
 }
+

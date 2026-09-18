@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getOfflineTransactions, getPendingSyncQueue } from '@/offline/queue';
 import { Transaction } from '@/types';
+import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
 import {
   Store,
   CreditCard,
@@ -43,7 +44,6 @@ export default function MerchantDashboardPage() {
       const pendingQueue = await getPendingSyncQueue();
       const localTxns = await getOfflineTransactions();
       let productsCount = await offlineDb.products.count();
-      if (productsCount === 0) productsCount = 6; // default mock catalog count
 
       let serverTxns: Transaction[] = [];
 
@@ -208,7 +208,7 @@ export default function MerchantDashboardPage() {
           <h3 className="text-base font-black text-navy-900 group-hover:text-amber-600 transition-colors">
             Sync Center ({stats.pendingSyncCount})
           </h3>
-          <p className="text-xs text-slate-500">Inspect Dexie offline queue logs & retry sync</p>
+          <p className="text-xs text-slate-500">Review pending transactions and sync now</p>
         </Link>
 
         <Link
@@ -258,19 +258,11 @@ export default function MerchantDashboardPage() {
                       {t.type}
                     </span>
                     <span
-                      className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md ${
-                        t.status === 'PENDING_SYNC'
-                          ? 'bg-amber-100 text-amber-800'
-                          : t.status === 'RETRY_PENDING'
-                          ? 'bg-rose-100 text-rose-800'
-                          : 'bg-emerald-100 text-emerald-800'
-                      }`}
+                      className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md ${transactionStatusTone(
+                        t.status
+                      )}`}
                     >
-                      {t.status === 'PENDING_SYNC'
-                        ? 'PENDING SYNC'
-                        : t.status === 'RETRY_PENDING'
-                        ? 'RETRY PENDING'
-                        : 'CONFIRMED'}
+                      {transactionStatusLabel(t.status)}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-400">

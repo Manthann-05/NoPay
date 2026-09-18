@@ -114,7 +114,7 @@ export function Navbar() {
     { label: 'Dashboard', href: '/customer/dashboard', icon: LayoutDashboard },
     { label: 'Scan QR', href: '/customer/scan', icon: QrCode },
     { label: 'Transactions', href: '/customer/transactions', icon: History },
-    { label: 'Settings', href: '/customer/settings', icon: Settings },
+    { label: 'Profile', href: '/customer/profile', icon: Settings },
   ];
 
   const merchantNav = [
@@ -124,7 +124,7 @@ export function Navbar() {
     { label: 'Static QR', href: '/merchant/static-qr', icon: QrCode },
     { label: 'Transactions', href: '/merchant/transactions', icon: History },
     { label: 'Reports', href: '/merchant/reports', icon: BarChart3 },
-    { label: 'Settings', href: '/merchant/settings', icon: Settings },
+    { label: 'Profile', href: '/merchant/profile', icon: Settings },
   ];
 
   const currentNavItems = activeRole === 'MERCHANT' ? merchantNav : customerNav;

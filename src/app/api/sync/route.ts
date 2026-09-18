@@ -1,16 +1,24 @@
 import { NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import { getSessionUser } from '@/lib/auth/jwt';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { Transaction } from '@/models/Transaction';
 import { SyncLog } from '@/models/SyncLog';
 import { Bill } from '@/models/Bill';
+import { MerchantProfile } from '@/models/MerchantProfile';
 import { TransactionSyncSchema } from '@/lib/validation/schemas';
 
 export async function POST(req: Request) {
   try {
     const session = await getSessionUser();
-    const body = await req.json();
+    if (!session) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required to sync transactions' },
+        { status: 401 }
+      );
+    }
 
+    const body = await req.json();
     const validated = TransactionSyncSchema.parse(body);
 
     await connectToDatabase();
@@ -38,7 +46,21 @@ export async function POST(req: Request) {
       });
     }
 
-    // 2. If it's a Bill QR, verify bill existence & server total
+    // 2. Fetch authoritative Merchant Profile
+    let merchantName = validated.merchantName || 'NoPay Merchant';
+    if (mongoose.Types.ObjectId.isValid(validated.merchantId)) {
+      const profile = await MerchantProfile.findOne({
+        $or: [
+          { _id: validated.merchantId },
+          { userId: validated.merchantId }
+        ]
+      });
+      if (profile?.shopName) {
+        merchantName = profile.shopName;
+      }
+    }
+
+    // 3. If it's a Bill QR, verify bill existence & server total
     let validatedAmount = validated.amount;
     let billSummary;
 
@@ -55,14 +77,14 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3. Create new synchronized Transaction record
-    const customerId = session ? session.userId : validated.customerId;
-    const customerName = session ? session.name : (validated.customerName || 'Offline Customer');
+    // 4. Create new synchronized Transaction record using session user identity
+    const customerId = session.userId;
+    const customerName = session.name;
 
     const newTxn = await Transaction.create({
       transactionId: validated.transactionId,
       merchantId: validated.merchantId,
-      merchantName: validated.merchantName,
+      merchantName,
       customerId,
       customerName,
       billId: validated.billId,
@@ -75,7 +97,7 @@ export async function POST(req: Request) {
       syncedAt: new Date(),
     });
 
-    // 4. Record Sync Log
+    // 5. Record Sync Log
     await SyncLog.create({
       transactionId: newTxn.transactionId,
       idempotencyKey: validated.idempotencyKey,
@@ -107,3 +129,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: 'Server failed to process sync' }, { status: 500 });
   }
 }
+
