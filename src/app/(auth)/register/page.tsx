@@ -45,6 +45,28 @@ export default function RegisterPage() {
         return;
       }
 
+      // Automatically log them in by fetching their profile and saving to offline session
+      try {
+        const meRes = await fetch('/api/auth/me');
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          if (meData.authenticated && meData.user) {
+            const { user } = meData;
+            await (await import('@/offline/session')).saveLocalSession(
+              user.userId,
+              user.name,
+              user.email,
+              user.roles,
+              user.activeRole,
+              user.merchantProfileId,
+              user.merchantProfile?.shopName
+            );
+          }
+        }
+      } catch (err) {
+        console.warn('Could not save offline session during registration', err);
+      }
+
       if (initialRole === 'MERCHANT') {
         router.push('/merchant/dashboard');
       } else {

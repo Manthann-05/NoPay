@@ -64,8 +64,10 @@ export type TransactionStatus =
   | 'PENDING_SYNC'
   | 'SYNCING'
   | 'CONFIRMED'
+  | 'SYNCED'
   | 'FAILED'
-  | 'REJECTED';
+  | 'REJECTED'
+  | 'RETRY_PENDING';
 
 export type TransactionType = 'STATIC_QR' | 'BILL_QR';
 
@@ -94,14 +96,25 @@ export interface Transaction {
   syncedAt?: string;
 }
 
+export type OfflineSyncQueueState =
+  | 'PENDING_SYNC'
+  | 'SYNCING'
+  | 'CONFIRMED'
+  | 'SYNCED'
+  | 'FAILED'
+  | 'REJECTED'
+  | 'RETRY_PENDING';
+
 export interface OfflineSyncQueueItem {
   id?: number; // Dexie auto-increment ID
   transactionId: string;
   idempotencyKey: string;
   payload: Transaction;
   attempts: number;
+  maxAttempts?: number;
   lastAttemptAt?: string;
-  state: 'PENDING_SYNC' | 'SYNCING' | 'FAILED' | 'CONFIRMED';
+  nextRetryAt?: string;
+  state: OfflineSyncQueueState;
   error?: string;
   createdAt: string;
 }
@@ -133,3 +146,21 @@ export interface BillQrPayload {
 }
 
 export type DecodedQrPayload = StaticMerchantQrPayload | BillQrPayload;
+
+/**
+ * Local session stored in IndexedDB for offline access.
+ * SECURITY: No passwords, JWT secrets, or tokens stored here.
+ * Only the minimum profile information needed to render the app shell offline.
+ */
+export interface LocalSession {
+  id: string; // always 'current' — singleton pattern
+  userId: string;
+  name: string;
+  email: string;
+  roles: UserRole[];
+  activeRole: UserRole;
+  merchantProfileId?: string;
+  merchantName?: string;
+  lastSyncedAt: string;
+  createdAt: string;
+}

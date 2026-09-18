@@ -12,17 +12,34 @@ export default function MerchantStaticQrPage() {
   });
 
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.user) {
+    async function loadMerchantData() {
+      try {
+        const { getLocalSession } = await import('@/offline/session');
+        const session = await getLocalSession();
+        if (session) {
           setMerchant({
-            id: data.user.merchantProfileId || 'SHOP123',
-            name: data.user.name ? `${data.user.name}'s Shop` : 'NoPay General Store',
+            id: session.merchantProfileId || session.userId || 'SHOP123',
+            name: session.merchantName || (session.name ? `${session.name}'s Shop` : 'NoPay General Store'),
           });
         }
-      })
-      .catch(console.error);
+
+        if (typeof navigator !== 'undefined' && navigator.onLine) {
+          const res = await fetch('/api/auth/me');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.user) {
+              setMerchant({
+                id: data.user.merchantProfileId || 'SHOP123',
+                name: data.user.merchantProfile?.shopName || (data.user.name ? `${data.user.name}'s Shop` : 'NoPay General Store'),
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Error loading merchant profile:', err);
+      }
+    }
+    loadMerchantData();
   }, []);
 
   const qrPayload = encodeStaticMerchantQrPayload({

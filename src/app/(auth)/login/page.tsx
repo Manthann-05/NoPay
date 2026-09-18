@@ -31,7 +31,19 @@ export default function LoginPage() {
         return;
       }
 
-      if (data.user.activeRole === 'MERCHANT') {
+      // Save session for offline mode
+      const { user } = data;
+      await (await import('@/offline/session')).saveLocalSession(
+        user.userId,
+        user.name,
+        user.email,
+        user.roles,
+        user.activeRole,
+        user.merchantProfileId,
+        user.merchantProfile?.shopName
+      );
+
+      if (user.activeRole === 'MERCHANT') {
         router.push('/merchant/dashboard');
       } else {
         router.push('/customer/dashboard');

@@ -50,11 +50,18 @@ export default function CustomerStaticPayPage() {
     const txnId = `TXN-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
     const idempotencyKey = `IDEM-${txnId}-${Date.now()}`;
 
+    let customerName = 'Customer';
+    try {
+      const { getLocalSession } = await import('@/offline/session');
+      const session = await getLocalSession();
+      if (session?.name) customerName = session.name;
+    } catch {}
+
     const newTxn: Transaction = {
       transactionId: txnId,
       merchantId: payload.merchantId,
       merchantName: payload.merchantName,
-      customerName: 'Customer',
+      customerName,
       amount: numAmount,
       type: 'STATIC_QR',
       status: 'PENDING_SYNC',

@@ -61,16 +61,59 @@ export default function MerchantPosBillingPage() {
   const [scannerOpen, setScannerOpen] = useState<boolean>(false);
   const [checkoutSuccess, setCheckoutSuccess] = useState<boolean>(false);
 
+  // Merchant session
+  const [merchantInfo, setMerchantInfo] = useState<{ merchantId: string; shopName: string }>({
+    merchantId: 'SHOP123',
+    shopName: 'NoPay Store POS',
+  });
+
   useEffect(() => {
-    // Fetch products from server if available
-    fetch('/api/products')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.products && data.products.length > 0) {
-          setProducts(data.products);
+    async function initCatalogAndSession() {
+      try {
+        const { offlineDb } = await import('@/offline/db');
+        const { getLocalSession } = await import('@/offline/session');
+
+        // 1. Load session for real merchant identity
+        const session = await getLocalSession();
+        if (session) {
+          setMerchantInfo({
+            merchantId: session.merchantProfileId || session.userId || 'SHOP123',
+            shopName: session.merchantName || session.name || 'NoPay Store POS',
+          });
         }
-      })
-      .catch((e) => console.warn('Using default mock catalog offline', e));
+
+        // 2. Load products from Dexie IndexedDB first
+        const localProducts = await offlineDb.products.toArray();
+        if (localProducts.length > 0) {
+          setProducts(localProducts);
+        } else {
+          // Seed local IndexedDB with default mock products
+          await offlineDb.products.bulkPut(MOCK_PRODUCTS);
+          setProducts(MOCK_PRODUCTS);
+        }
+
+        // 3. If online, fetch updated products from server and cache to Dexie
+        if (typeof navigator !== 'undefined' && navigator.onLine) {
+          try {
+            const res = await fetch('/api/products');
+            if (res.ok) {
+              const data = await res.json();
+              if (data.products && data.products.length > 0) {
+                setProducts(data.products);
+                await offlineDb.products.clear();
+                await offlineDb.products.bulkPut(data.products);
+              }
+            }
+          } catch (e) {
+            console.warn('Could not sync products from API, using offline products');
+          }
+        }
+      } catch (err) {
+        console.warn('Error initializing POS catalog:', err);
+      }
+    }
+
+    initCatalogAndSession();
   }, []);
 
   const categories = ['ALL', ...Array.from(new Set(products.map((p) => p.category || 'General')))];
@@ -160,8 +203,8 @@ export default function MerchantPosBillingPage() {
     const encoded = encodeBillQrPayload({
       transactionId,
       billId,
-      merchantId: 'SHOP123',
-      merchantName: 'NoPay Store POS',
+      merchantId: merchantInfo.merchantId,
+      merchantName: merchantInfo.shopName,
       items: itemsPayload,
       total: grandTotal,
     });
@@ -170,18 +213,42 @@ export default function MerchantPosBillingPage() {
     setQrPayload(encoded);
     setQrModalOpen(true);
 
-    // Sync or save bill asynchronously
-    fetch('/api/bills', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    // Save bill to local Dexie bills table (offline-first)
+    try {
+      const { offlineDb } = await import('@/offline/db');
+      await offlineDb.bills.put({
+        _id: billId,
+        billId,
+        merchantId: merchantInfo.merchantId,
+        merchantName: merchantInfo.shopName,
         items: itemsPayload,
         subtotal,
         discount,
         tax: taxAmount,
-        totalAmount: grandTotal,
-      }),
-    }).catch((err) => console.warn('Saved local offline bill QR payload', err));
+        total: grandTotal,
+        status: 'PENDING',
+        createdAt: new Date().toISOString(),
+      });
+    } catch (dbErr) {
+      console.warn('Failed to save bill to local Dexie DB:', dbErr);
+    }
+
+    // If online, also post to API asynchronously
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      fetch('/api/bills', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          billId,
+          transactionId,
+          items: itemsPayload,
+          subtotal,
+          discount,
+          tax: taxAmount,
+          totalAmount: grandTotal,
+        }),
+      }).catch((err) => console.warn('Saved local offline bill QR payload', err));
+    }
   };
 
   const handleBarcodeScanSuccess = (payload: DecodedQrPayload, rawText: string) => {

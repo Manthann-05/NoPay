@@ -1,5 +1,5 @@
 import { offlineDb } from './db';
-import { Transaction, OfflineSyncQueueItem } from '@/types';
+import { Transaction, OfflineSyncQueueItem, OfflineSyncQueueState } from '@/types';
 
 export async function addOfflineTransaction(txn: Transaction): Promise<OfflineSyncQueueItem> {
   // 1. Save to local IndexedDB transactions table
@@ -23,39 +23,51 @@ export async function addOfflineTransaction(txn: Transaction): Promise<OfflineSy
 }
 
 export async function getPendingSyncQueue(): Promise<OfflineSyncQueueItem[]> {
-  return offlineDb.syncQueue
-    .where('state')
-    .equals('PENDING_SYNC')
-    .toArray();
+  const pending = await offlineDb.syncQueue.where('state').equals('PENDING_SYNC').toArray();
+  const retrying = await offlineDb.syncQueue.where('state').equals('RETRY_PENDING').toArray();
+  
+  // Filter out retry items that shouldn't be retried yet based on backoff
+  const now = new Date().getTime();
+  const readyToRetry = retrying.filter(item => {
+    if (!item.nextRetryAt) return true;
+    return new Date(item.nextRetryAt).getTime() <= now;
+  });
+  
+  return [...pending, ...readyToRetry];
 }
 
 export async function markSyncQueueState(
   transactionId: string,
-  state: 'SYNCING' | 'CONFIRMED' | 'FAILED',
-  error?: string
+  state: OfflineSyncQueueState,
+  error?: string,
+  nextRetryAt?: string
 ): Promise<void> {
   const item = await offlineDb.syncQueue.where('transactionId').equals(transactionId).first();
   if (item && item.id) {
     await offlineDb.syncQueue.update(item.id, {
       state,
       error,
-      attempts: item.attempts + 1,
-      lastAttemptAt: new Date().toISOString(),
+      attempts: state === 'SYNCING' ? item.attempts + 1 : item.attempts,
+      lastAttemptAt: state === 'SYNCING' ? new Date().toISOString() : item.lastAttemptAt,
+      nextRetryAt,
     });
   }
 
   // Update local transaction status as well
-  const txnStatusMap = {
+  const txnStatusMap: Record<string, string> = {
     SYNCING: 'SYNCING',
     CONFIRMED: 'CONFIRMED',
+    SYNCED: 'SYNCED',
     FAILED: 'FAILED',
-  } as const;
+    REJECTED: 'REJECTED',
+    RETRY_PENDING: 'RETRY_PENDING',
+  };
 
   if (txnStatusMap[state]) {
     await offlineDb.transactions.where('transactionId').equals(transactionId).modify({
-      status: txnStatusMap[state],
+      status: txnStatusMap[state] as any,
       failureReason: error,
-      syncedAt: state === 'CONFIRMED' ? new Date().toISOString() : undefined,
+      syncedAt: (state === 'CONFIRMED' || state === 'SYNCED') ? new Date().toISOString() : undefined,
     });
   }
 }

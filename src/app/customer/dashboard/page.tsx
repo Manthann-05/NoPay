@@ -18,13 +18,29 @@ export default function CustomerDashboardPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch('/api/auth/me');
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data.user);
+        // 1. First load from local session (works completely offline)
+        const { getLocalSession } = await import('@/offline/session');
+        const session = await getLocalSession();
+        if (session) {
+          setUser({ name: session.name, email: session.email });
         }
 
-        // Load local transactions from Dexie
+        // 2. If online, optionally sync profile data from API
+        if (typeof navigator !== 'undefined' && navigator.onLine) {
+          try {
+            const res = await fetch('/api/auth/me');
+            if (res.ok) {
+              const data = await res.json();
+              if (data.authenticated && data.user) {
+                setUser(data.user);
+              }
+            }
+          } catch (e) {
+            // Ignore network errors when falling back
+          }
+        }
+
+        // 3. Load local transactions from Dexie
         const localData = await getAllLocalTransactions();
         setRecentTxns(localData.slice(0, 5));
       } catch (err) {
@@ -130,14 +146,20 @@ export default function CustomerDashboardPage() {
                   <div className="text-sm font-black text-navy-900">₹{txn.amount}</div>
                   <span
                     className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      txn.status === 'CONFIRMED'
+                      txn.status === 'CONFIRMED' || txn.status === 'SYNCED'
                         ? 'bg-emerald-100 text-emerald-800'
                         : txn.status === 'PENDING_SYNC'
                         ? 'bg-amber-100 text-amber-900'
+                        : txn.status === 'RETRY_PENDING'
+                        ? 'bg-rose-100 text-rose-900'
                         : 'bg-slate-200 text-slate-700'
                     }`}
                   >
-                    {txn.status === 'PENDING_SYNC' ? 'Pending Sync' : txn.status}
+                    {txn.status === 'PENDING_SYNC'
+                      ? 'Pending Sync'
+                      : txn.status === 'RETRY_PENDING'
+                      ? 'Retry Pending'
+                      : txn.status}
                   </span>
                 </div>
               </div>

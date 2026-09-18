@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { OfflineBadge } from './OfflineBadge';
 import { RoleSwitcher } from './RoleSwitcher';
 import { UserRole } from '@/types';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { getLocalSession, clearLocalSession } from '@/offline/session';
 import {
   QrCode,
   LayoutDashboard,
@@ -22,29 +24,85 @@ import {
   HelpCircle,
 } from 'lucide-react';
 
-interface NavbarProps {
-  user?: {
-    name: string;
-    email: string;
-    roles: UserRole[];
-    activeRole: UserRole;
-    merchantProfile?: {
-      shopName: string;
-    } | null;
+interface NavbarUser {
+  name: string;
+  email: string;
+  roles: UserRole[];
+  activeRole: UserRole;
+  merchantProfile?: {
+    shopName: string;
   } | null;
 }
 
-export function Navbar({ user }: NavbarProps) {
+export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { isOnline } = useOnlineStatus();
+  
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<NavbarUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadUser() {
+      setIsLoading(true);
+      try {
+        if (isOnline) {
+          // Fetch from API
+          const res = await fetch('/api/auth/me');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.authenticated) {
+              setUser(data.user);
+              return;
+            }
+          }
+        }
+        
+        // Fallback to local session if offline or API failed
+        const session = await getLocalSession();
+        if (session) {
+          setUser({
+            name: session.name,
+            email: session.email,
+            roles: session.roles,
+            activeRole: session.activeRole,
+            merchantProfile: session.merchantName ? { shopName: session.merchantName } : null
+          });
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.error('Failed to load user', err);
+        // Desperate fallback to local session
+        const session = await getLocalSession();
+        if (session) {
+          setUser({
+            name: session.name,
+            email: session.email,
+            roles: session.roles,
+            activeRole: session.activeRole,
+            merchantProfile: session.merchantName ? { shopName: session.merchantName } : null
+          });
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadUser();
+  }, [isOnline]);
 
   const activeRole = user?.activeRole || 'CUSTOMER';
   const roles = user?.roles || ['CUSTOMER'];
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      if (isOnline) {
+        await fetch('/api/auth/logout', { method: 'POST' });
+      }
+      await clearLocalSession();
+      setUser(null);
       router.push('/login');
       router.refresh();
     } catch (err) {
@@ -128,44 +186,46 @@ export function Navbar({ user }: NavbarProps) {
           <div className="flex items-center gap-3">
             <OfflineBadge />
 
-            {user ? (
-              <>
-                <div className="hidden md:block">
-                  <RoleSwitcher currentRole={activeRole} roles={roles} />
-                </div>
-
-                <div className="relative flex items-center gap-2 pl-2 border-l border-slate-200">
-                  <div className="hidden sm:flex flex-col text-right">
-                    <span className="text-xs font-bold text-slate-800 leading-tight">
-                      {user.name}
-                    </span>
-                    <span className="text-[10px] text-slate-500">{user.email}</span>
+            {!isLoading && (
+              user ? (
+                <>
+                  <div className="hidden md:block">
+                    <RoleSwitcher currentRole={activeRole} roles={roles} />
                   </div>
 
-                  <button
-                    onClick={handleLogout}
-                    title="Logout"
-                    className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                  <div className="relative flex items-center gap-2 pl-2 border-l border-slate-200">
+                    <div className="hidden sm:flex flex-col text-right">
+                      <span className="text-xs font-bold text-slate-800 leading-tight">
+                        {user.name}
+                      </span>
+                      <span className="text-[10px] text-slate-500">{user.email}</span>
+                    </div>
+
+                    <button
+                      onClick={handleLogout}
+                      title="Logout"
+                      className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/login"
+                    className="px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-navy-900 transition-colors"
                   >
-                    <LogOut className="w-4 h-4" />
-                  </button>
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="px-4 py-2 text-xs font-bold text-white bg-brand-blue hover:bg-brand-darkBlue rounded-xl shadow-sm transition-all"
+                  >
+                    Get Started
+                  </Link>
                 </div>
-              </>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Link
-                  href="/login"
-                  className="px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-navy-900 transition-colors"
-                >
-                  Sign In
-                </Link>
-                <Link
-                  href="/register"
-                  className="px-4 py-2 text-xs font-bold text-white bg-brand-blue hover:bg-brand-darkBlue rounded-xl shadow-sm transition-all"
-                >
-                  Get Started
-                </Link>
-              </div>
+              )
             )}
 
             {/* Mobile Hamburger Menu */}

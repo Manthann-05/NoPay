@@ -52,8 +52,8 @@ export default function CustomerTransactionsPage() {
   };
 
   const filteredTxns = transactions.filter((t) => {
-    if (filter === 'PENDING') return t.status === 'PENDING_SYNC';
-    if (filter === 'CONFIRMED') return t.status === 'CONFIRMED';
+    if (filter === 'PENDING') return t.status === 'PENDING_SYNC' || t.status === 'RETRY_PENDING';
+    if (filter === 'CONFIRMED') return t.status === 'CONFIRMED' || t.status === 'SYNCED';
     return true;
   });
 
@@ -113,10 +113,18 @@ export default function CustomerTransactionsPage() {
               <div className="flex items-center gap-3">
                 <div
                   className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                    t.status === 'PENDING_SYNC' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
+                    t.status === 'PENDING_SYNC'
+                      ? 'bg-amber-50 text-amber-600'
+                      : t.status === 'RETRY_PENDING'
+                      ? 'bg-rose-50 text-rose-600'
+                      : 'bg-emerald-50 text-emerald-600'
                   }`}
                 >
-                  {t.status === 'PENDING_SYNC' ? <Clock className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
+                  {t.status === 'PENDING_SYNC' || t.status === 'RETRY_PENDING' ? (
+                    <Clock className="w-5 h-5" />
+                  ) : (
+                    <CheckCircle2 className="w-5 h-5" />
+                  )}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -125,10 +133,16 @@ export default function CustomerTransactionsPage() {
                       className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md ${
                         t.status === 'PENDING_SYNC'
                           ? 'bg-amber-100 text-amber-800'
+                          : t.status === 'RETRY_PENDING'
+                          ? 'bg-rose-100 text-rose-800'
                           : 'bg-emerald-100 text-emerald-800'
                       }`}
                     >
-                      {t.status === 'PENDING_SYNC' ? 'OFFLINE QUEUED' : 'CONFIRMED'}
+                      {t.status === 'PENDING_SYNC'
+                        ? 'OFFLINE QUEUED'
+                        : t.status === 'RETRY_PENDING'
+                        ? 'RETRY PENDING'
+                        : 'CONFIRMED'}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-400 font-mono">

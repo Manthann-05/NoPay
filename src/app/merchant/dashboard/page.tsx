@@ -38,28 +38,32 @@ export default function MerchantDashboardPage() {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      // Load offline pending count
+      // 1. Load local Dexie data first (completely offline)
+      const { offlineDb } = await import('@/offline/db');
       const pendingQueue = await getPendingSyncQueue();
       const localTxns = await getOfflineTransactions();
+      let productsCount = await offlineDb.products.count();
+      if (productsCount === 0) productsCount = 6; // default mock catalog count
 
-      // Fetch online API products & transactions
-      let productsCount = 5;
       let serverTxns: Transaction[] = [];
 
-      try {
-        const prodRes = await fetch('/api/products');
-        if (prodRes.ok) {
-          const prodData = await prodRes.json();
-          productsCount = prodData.products?.length || 0;
-        }
+      // 2. Fetch online API products & transactions only if online
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
+        try {
+          const prodRes = await fetch('/api/products');
+          if (prodRes.ok) {
+            const prodData = await prodRes.json();
+            if (prodData.products) productsCount = prodData.products.length;
+          }
 
-        const txnRes = await fetch('/api/transactions');
-        if (txnRes.ok) {
-          const txnData = await txnRes.json();
-          serverTxns = txnData.transactions || [];
+          const txnRes = await fetch('/api/transactions');
+          if (txnRes.ok) {
+            const txnData = await txnRes.json();
+            serverTxns = txnData.transactions || [];
+          }
+        } catch (e) {
+          console.warn('API fetch warning:', e);
         }
-      } catch (e) {
-        console.warn('API fetch warning:', e);
       }
 
       // Merge transactions
@@ -257,10 +261,16 @@ export default function MerchantDashboardPage() {
                       className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md ${
                         t.status === 'PENDING_SYNC'
                           ? 'bg-amber-100 text-amber-800'
+                          : t.status === 'RETRY_PENDING'
+                          ? 'bg-rose-100 text-rose-800'
                           : 'bg-emerald-100 text-emerald-800'
                       }`}
                     >
-                      {t.status === 'PENDING_SYNC' ? 'PENDING SYNC' : 'CONFIRMED'}
+                      {t.status === 'PENDING_SYNC'
+                        ? 'PENDING SYNC'
+                        : t.status === 'RETRY_PENDING'
+                        ? 'RETRY PENDING'
+                        : 'CONFIRMED'}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-400">

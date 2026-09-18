@@ -1,60 +1,133 @@
-const CACHE_NAME = 'nopay-v1';
-const STATIC_ASSETS = [
+const CACHE_NAME = 'nopay-cache-v2';
+const DYNAMIC_CACHE = 'nopay-dynamic-v2';
+
+const APP_SHELL = [
   '/',
-  '/manifest.json',
+  '/login',
+  '/register',
   '/customer/dashboard',
   '/customer/scan',
+  '/customer/transactions',
+  '/customer/payment',
   '/merchant/dashboard',
-  '/merchant/billing'
+  '/merchant/billing',
+  '/merchant/static-qr',
+  '/merchant/sync',
+  '/merchant/transactions',
+  '/manifest.json',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn('SW cache.addAll soft error:', err);
-      });
-    })
+      console.log('SW: Precaching app shell');
+      // We use map and catch to ensure failure of one doesn't crash the whole precache
+      return Promise.all(
+        APP_SHELL.map(url => 
+          cache.add(url).catch(err => console.warn(`SW: Failed to cache ${url}`, err))
+        )
+      );
+    }).then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
+    caches.keys().then((cacheNames) => {
       return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME && cacheName !== DYNAMIC_CACHE) {
+            console.log('SW: Clearing old cache', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  // Do not cache API routes or POST requests
-  if (event.request.url.includes('/api/') || event.request.method !== 'GET') {
+  const url = new URL(event.request.url);
+
+  // Never cache API requests, let them fail naturally or be caught by api.ts wrapper
+  if (url.pathname.startsWith('/api/')) {
+    return; // Standard network request
+  }
+
+  // Next.js Data requests (Network First, fallback to cache)
+  if (url.pathname.startsWith('/_next/data/')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          const clone = networkResponse.clone();
+          caches.open(DYNAMIC_CACHE).then((cache) => cache.put(event.request, clone));
+          return networkResponse;
+        })
+        .catch(async () => {
+          const cachedResponse = await caches.match(event.request);
+          return cachedResponse || new Response(JSON.stringify({}), { headers: { 'Content-Type': 'application/json' } });
+        })
+    );
     return;
   }
 
-  event.respondWith(
-    fetch(event.request)
-      .then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
-        }
-        return networkResponse;
-      })
-      .catch(async () => {
-        const cachedResponse = await caches.match(event.request);
+  // Next.js Static Assets (Cache First)
+  if (url.pathname.startsWith('/_next/static/') || url.pathname.match(/\.(png|jpg|jpeg|svg|gif|woff2?|css|js)$/)) {
+    event.respondWith(
+      caches.match(event.request).then((cachedResponse) => {
         if (cachedResponse) {
           return cachedResponse;
         }
-        if (event.request.mode === 'navigate') {
-          return caches.match('/');
-        }
+        return fetch(event.request).then((networkResponse) => {
+          if (networkResponse.ok) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        });
       })
-  );
+    );
+    return;
+  }
+
+  // Navigation Requests (App Shell Navigation - Stale-While-Revalidate / Cache First with fallback)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      caches.match(event.request).then((cachedResponse) => {
+        if (cachedResponse) {
+          // In background, revalidate if online
+          fetch(event.request)
+            .then((networkResponse) => {
+              if (networkResponse && networkResponse.ok) {
+                const clone = networkResponse.clone();
+                caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+              }
+            })
+            .catch(() => {}); // Ignore network errors in background
+          return cachedResponse;
+        }
+
+        return fetch(event.request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.ok) {
+              const clone = networkResponse.clone();
+              caches.open(DYNAMIC_CACHE).then((cache) => cache.put(event.request, clone));
+            }
+            return networkResponse;
+          })
+          .catch(async () => {
+            const fallbackResponse = await caches.match(url.pathname) || await caches.match('/');
+            if (fallbackResponse) return fallbackResponse;
+
+            return new Response('<!DOCTYPE html><html><body><h2>Offline Mode</h2><p>Please connect to the internet once to cache the full app shell.</p></body></html>', {
+              status: 503,
+              headers: { 'Content-Type': 'text/html' }
+            });
+          });
+      })
+    );
+    return;
+  }
 });

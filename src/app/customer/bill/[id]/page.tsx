@@ -71,12 +71,19 @@ export default function CustomerBillDetailPage() {
     const txnId = billPayload.transactionId || `TXN-${Date.now()}`;
     const idempotencyKey = `IDEM-${txnId}-${billPayload.billId}`;
 
+    let customerName = 'Customer';
+    try {
+      const { getLocalSession } = await import('@/offline/session');
+      const session = await getLocalSession();
+      if (session?.name) customerName = session.name;
+    } catch {}
+
     const newTxn: Transaction = {
       transactionId: txnId,
       billId: billPayload.billId,
       merchantId: billPayload.merchantId,
       merchantName: billPayload.merchantName,
-      customerName: 'Customer',
+      customerName,
       amount: billPayload.total,
       type: 'BILL_QR',
       status: 'PENDING_SYNC',

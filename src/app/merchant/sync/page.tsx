@@ -121,21 +121,38 @@ export default function MerchantSyncPage() {
                   <th className="p-3">Idempotency Key</th>
                   <th className="p-3">State</th>
                   <th className="p-3">Attempts</th>
+                  <th className="p-3">Error / Backoff Details</th>
                   <th className="p-3">Last Attempt</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-navy-900">
                 {queue.map((item) => (
-                  <tr key={item.id}>
+                  <tr key={item.id} className="hover:bg-slate-50/50">
                     <td className="p-3 font-mono text-[11px]">{item.id}</td>
                     <td className="p-3 font-mono font-bold">{item.transactionId}</td>
                     <td className="p-3 font-mono text-[10px] text-slate-500">{item.idempotencyKey}</td>
                     <td className="p-3">
-                      <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-extrabold rounded-md">
+                      <span
+                        className={`px-2 py-0.5 text-[10px] font-extrabold rounded-md ${
+                          item.state === 'RETRY_PENDING'
+                            ? 'bg-rose-100 text-rose-800'
+                            : item.state === 'PENDING_SYNC'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-emerald-100 text-emerald-800'
+                        }`}
+                      >
                         {item.state}
                       </span>
                     </td>
-                    <td className="p-3 font-bold">{item.attempts}</td>
+                    <td className="p-3 font-bold">
+                      {item.attempts}
+                      {item.state === 'RETRY_PENDING' && (
+                        <span className="text-[10px] text-rose-600 ml-1 font-normal">(retry backoff)</span>
+                      )}
+                    </td>
+                    <td className="p-3 text-[11px] text-slate-500 max-w-xs truncate">
+                      {item.error || (item.state === 'RETRY_PENDING' ? 'Waiting for backoff timer or network' : 'Awaiting network sync')}
+                    </td>
                     <td className="p-3 text-slate-400 font-mono text-[11px]">
                       {item.lastAttemptAt ? new Date(item.lastAttemptAt).toLocaleTimeString() : '—'}
                     </td>

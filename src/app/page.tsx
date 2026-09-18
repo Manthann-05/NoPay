@@ -1,18 +1,69 @@
-import React from 'react';
+'use client';
+
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
-import { getSessionUser } from '@/lib/auth/jwt';
+import { useRouter } from 'next/navigation';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { getLocalSession } from '@/offline/session';
 import { QrCode, Store, Smartphone, ShieldCheck, Zap, RefreshCw, ArrowRight } from 'lucide-react';
 
-export default async function HomePage() {
-  const session = await getSessionUser();
+export default function HomePage() {
+  const router = useRouter();
+  const { isOnline } = useOnlineStatus();
+  const [isChecking, setIsChecking] = useState(true);
 
-  if (session) {
-    if (session.activeRole === 'MERCHANT') {
-      redirect('/merchant/dashboard');
-    } else {
-      redirect('/customer/dashboard');
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        if (isOnline) {
+          const res = await fetch('/api/auth/me');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.authenticated && data.user) {
+              if (data.user.activeRole === 'MERCHANT') {
+                router.push('/merchant/dashboard');
+              } else {
+                router.push('/customer/dashboard');
+              }
+              return;
+            }
+          }
+        }
+        
+        // Offline fallback or not authenticated online
+        const session = await getLocalSession();
+        if (session) {
+          if (session.activeRole === 'MERCHANT') {
+            router.push('/merchant/dashboard');
+          } else {
+            router.push('/customer/dashboard');
+          }
+        } else {
+          setIsChecking(false);
+        }
+      } catch (err) {
+        // Desperate fallback
+        const session = await getLocalSession();
+        if (session) {
+          if (session.activeRole === 'MERCHANT') {
+            router.push('/merchant/dashboard');
+          } else {
+            router.push('/customer/dashboard');
+          }
+        }
+        setIsChecking(false);
+      }
     }
+
+    checkAuth();
+  }, [isOnline, router]);
+
+  if (isChecking) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-12 h-12 border-4 border-brand-blue border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
   }
 
   return (

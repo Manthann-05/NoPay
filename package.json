@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node -e \"delete process.env.NODE_ENV; const { spawnSync } = require('child_process'); const res = spawnSync('npx', ['next', 'build'], { stdio: 'inherit', shell: true }); process.exit(res.status ?? 0);\"",
     "start": "next start",
     "lint": "next lint"
   },

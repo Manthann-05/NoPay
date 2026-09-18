@@ -28,21 +28,34 @@ export function RoleSwitcher({ currentRole, roles, hasMerchantProfile, onRoleCha
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/me', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ activeRole: targetRole }),
-      });
-
-      if (res.ok) {
-        if (onRoleChanged) onRoleChanged(targetRole);
-        if (targetRole === 'MERCHANT') {
-          router.push('/merchant/dashboard');
-        } else {
-          router.push('/customer/dashboard');
-        }
-        router.refresh();
+      // 1. Always update local session in Dexie (works offline)
+      try {
+        const { updateLocalActiveRole } = await import('@/offline/session');
+        await updateLocalActiveRole(targetRole);
+      } catch (e) {
+        console.warn('Could not update local session role:', e);
       }
+
+      // 2. If online, sync to server
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
+        try {
+          await fetch('/api/auth/me', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ activeRole: targetRole }),
+          });
+        } catch (apiErr) {
+          console.warn('Could not sync role change to API:', apiErr);
+        }
+      }
+
+      if (onRoleChanged) onRoleChanged(targetRole);
+      if (targetRole === 'MERCHANT') {
+        router.push('/merchant/dashboard');
+      } else {
+        router.push('/customer/dashboard');
+      }
+      router.refresh();
     } catch (err) {
       console.error('Failed to switch role:', err);
     } finally {

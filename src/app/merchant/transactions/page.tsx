@@ -56,7 +56,7 @@ export default function MerchantTransactionsPage() {
         ? t.type === 'BILL_QR'
         : filter === 'STATIC_QR'
         ? t.type === 'STATIC_QR'
-        : t.status === 'PENDING_SYNC';
+        : t.status === 'PENDING_SYNC' || t.status === 'RETRY_PENDING';
 
     const matchesSearch =
       t.transactionId.toLowerCase().includes(search.toLowerCase()) ||
@@ -155,12 +155,18 @@ export default function MerchantTransactionsPage() {
                         className={`px-2.5 py-1 text-[10px] font-extrabold rounded-md flex items-center gap-1 w-fit ${
                           t.status === 'PENDING_SYNC'
                             ? 'bg-amber-100 text-amber-800'
+                            : t.status === 'RETRY_PENDING'
+                            ? 'bg-rose-100 text-rose-800'
                             : 'bg-emerald-100 text-emerald-800'
                         }`}
                       >
                         {t.status === 'PENDING_SYNC' ? (
                           <>
                             <Clock className="w-3 h-3" /> PENDING SYNC
+                          </>
+                        ) : t.status === 'RETRY_PENDING' ? (
+                          <>
+                            <Clock className="w-3 h-3" /> RETRY PENDING
                           </>
                         ) : (
                           <>

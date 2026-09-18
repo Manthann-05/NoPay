@@ -12,6 +12,10 @@ type SyncCallback = (progress: SyncProgress) => void;
 
 let isSyncInProgress = false;
 
+// Backoff in ms: 0s, 2s, 5s, 15s, 30s
+const BACKOFF_DELAYS = [0, 2000, 5000, 15000, 30000];
+const MAX_RETRIES = 5;
+
 export async function processSyncQueue(onProgress?: SyncCallback): Promise<{
   syncedCount: number;
   failedCount: number;
@@ -63,13 +67,22 @@ export async function processSyncQueue(onProgress?: SyncCallback): Promise<{
           await markSyncQueueState(item.transactionId, 'CONFIRMED');
           syncedCount++;
         } else {
+          // Server rejected it (e.g. validation error) - do not retry
           const errorMsg = data.error || data.message || 'Sync rejected by server';
-          await markSyncQueueState(item.transactionId, 'FAILED', errorMsg);
+          await markSyncQueueState(item.transactionId, 'REJECTED', errorMsg);
           failedCount++;
         }
       } catch (err: any) {
-        await markSyncQueueState(item.transactionId, 'FAILED', err.message || 'Network connection failed during sync');
-        failedCount++;
+        // Network failure during fetch - we should retry
+        const attempts = (item.attempts || 0) + 1;
+        if (attempts >= MAX_RETRIES) {
+          await markSyncQueueState(item.transactionId, 'FAILED', err.message || 'Max retries exceeded');
+          failedCount++;
+        } else {
+          const delay = BACKOFF_DELAYS[attempts] || BACKOFF_DELAYS[BACKOFF_DELAYS.length - 1];
+          const nextRetryAt = new Date(Date.now() + delay).toISOString();
+          await markSyncQueueState(item.transactionId, 'RETRY_PENDING', err.message || 'Network error, will retry', nextRetryAt);
+        }
       }
 
       if (onProgress) {

@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react';
 
+export type SyncState = 'IDLE' | 'CONNECTING' | 'SYNCING';
+
 export function useOnlineStatus() {
   const [isOnline, setIsOnline] = useState<boolean>(true);
-  const [isChecking, setIsChecking] = useState<boolean>(false);
+  const [syncState, setSyncState] = useState<SyncState>('IDLE');
 
   useEffect(() => {
     // Set initial status based on browser navigator
@@ -18,7 +20,7 @@ export function useOnlineStatus() {
         return;
       }
 
-      setIsChecking(true);
+      setSyncState('CONNECTING');
       try {
         // Heartbeat API check with low timeout
         const controller = new AbortController();
@@ -35,11 +37,12 @@ export function useOnlineStatus() {
       } catch (err) {
         setIsOnline(false);
       } finally {
-        setIsChecking(false);
+        setSyncState('IDLE');
       }
     };
 
     const handleOnline = () => {
+      setIsOnline(true);
       checkRealConnectivity();
     };
 
@@ -50,15 +53,16 @@ export function useOnlineStatus() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Periodic heartbeat check every 15 seconds
-    const interval = setInterval(checkRealConnectivity, 15000);
+    // Initial check without periodic polling
+    if (navigator.onLine) {
+      checkRealConnectivity();
+    }
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      clearInterval(interval);
     };
   }, []);
 
-  return { isOnline, isChecking };
+  return { isOnline, isChecking: syncState === 'CONNECTING', syncState, setSyncState };
 }
