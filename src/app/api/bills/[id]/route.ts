@@ -4,11 +4,12 @@ import { Bill } from '@/models/Bill';
 import { getRequiredSession, authErrorResponse } from '@/lib/auth/apiGuards';
 import { isBillExpired } from '@/lib/status/labels';
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getRequiredSession();
     await connectToDatabase();
-    const bill = await Bill.findOne({ billId: params.id });
+    const resolvedParams = await params;
+    const bill = await Bill.findOne({ billId: resolvedParams.id });
     if (!bill) {
       return NextResponse.json({ error: 'Bill not found' }, { status: 404 });
     }

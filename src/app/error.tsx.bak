@@ -2,6 +2,9 @@
 
 import React from 'react';
 
+// Force dynamic rendering to avoid pre-rendering issues
+export const dynamic = 'force-dynamic';
+
 export default function GlobalError({
   error,
   reset,

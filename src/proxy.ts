@@ -5,7 +5,7 @@ import { getEnv } from '@/lib/env';
 
 const TOKEN_COOKIE_NAME = 'nopay_session';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isCustomerRoute = pathname.startsWith('/customer');

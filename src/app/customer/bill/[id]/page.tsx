@@ -9,6 +9,9 @@ import { readScannedQr } from '@/lib/qr/scanHandoff';
 import { isBillExpired } from '@/lib/status/labels';
 import { CreditCard, ArrowLeft, ShieldCheck, WifiOff } from 'lucide-react';
 
+// Force dynamic rendering to avoid pre-rendering issues with client-side hooks
+export const dynamic = 'force-dynamic';
+
 export default function CustomerBillDetailPage() {
   const router = useRouter();
   const params = useParams();

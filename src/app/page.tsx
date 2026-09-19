@@ -1,59 +1,91 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { getLocalSession } from '@/offline/session';
 import { Zap, ArrowRight } from 'lucide-react';
 
+// Force dynamic rendering to avoid pre-rendering issues with client-side hooks
+export const dynamic = 'force-dynamic';
+
+function getDashboardRouteFromSession(session: { activeRole?: string; roles?: string[] } | null | undefined) {
+  if (!session) return null;
+
+  if (session.activeRole === 'MERCHANT' && session.roles?.includes('MERCHANT')) {
+    return '/merchant/dashboard';
+  }
+
+  if (session.activeRole === 'CUSTOMER' || session.roles?.includes('CUSTOMER')) {
+    return '/customer/dashboard';
+  }
+
+  return null;
+}
+
 export default function HomePage() {
   const router = useRouter();
   const { isOnline } = useOnlineStatus();
   const [isChecking, setIsChecking] = useState(true);
+  const didRedirectRef = useRef(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function checkAuth() {
+      if (didRedirectRef.current) return;
+
       try {
         if (isOnline) {
-          const res = await fetch('/api/auth/me');
-          if (res.ok) {
+          const res = await fetch('/api/auth/me', { cache: 'no-store' });
+          if (!cancelled && res.ok) {
             const data = await res.json();
-            if (data.authenticated && data.user) {
-              if (data.user.activeRole === 'MERCHANT') {
-                router.push('/merchant/dashboard');
-              } else {
-                router.push('/customer/dashboard');
-              }
+            const route = data?.authenticated && data?.user
+              ? getDashboardRouteFromSession({
+                  activeRole: data.user.activeRole,
+                  roles: data.user.roles,
+                })
+              : null;
+
+            if (route) {
+              didRedirectRef.current = true;
+              router.replace(route);
               return;
             }
           }
         }
 
         const session = await getLocalSession();
-        if (session) {
-          if (session.activeRole === 'MERCHANT' && session.roles?.includes('MERCHANT')) {
-            router.push('/merchant/dashboard');
-          } else {
-            router.push('/customer/dashboard');
-          }
-        } else {
-          setIsChecking(false);
+        if (cancelled) return;
+
+        const localRoute = getDashboardRouteFromSession(session);
+        if (localRoute) {
+          didRedirectRef.current = true;
+          router.replace(localRoute);
+          return;
         }
+
+        setIsChecking(false);
       } catch {
+        if (cancelled) return;
+
         const session = await getLocalSession();
-        if (session) {
-          if (session.activeRole === 'MERCHANT' && session.roles?.includes('MERCHANT')) {
-            router.push('/merchant/dashboard');
-          } else {
-            router.push('/customer/dashboard');
-          }
+        const localRoute = getDashboardRouteFromSession(session);
+        if (localRoute) {
+          didRedirectRef.current = true;
+          router.replace(localRoute);
+          return;
         }
+
         setIsChecking(false);
       }
     }
 
-    checkAuth();
+    void checkAuth();
+    return () => {
+      cancelled = true;
+    };
   }, [isOnline, router]);
 
   if (isChecking) {

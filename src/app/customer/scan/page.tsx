@@ -7,6 +7,9 @@ import { NoPayQrResult } from '@/lib/qr/payload';
 import { storeScannedQrRaw } from '@/lib/qr/scanHandoff';
 import { QrCode, ArrowLeft } from 'lucide-react';
 
+// Force dynamic rendering to avoid pre-rendering issues with client-side hooks
+export const dynamic = 'force-dynamic';
+
 export default function CustomerScanPage() {
   const router = useRouter();
   const [scannerOpen, setScannerOpen] = useState(true);

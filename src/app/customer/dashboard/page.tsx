@@ -10,8 +10,13 @@ import { NoPayQrResult } from '@/lib/qr/payload';
 import { storeScannedQrRaw } from '@/lib/qr/scanHandoff';
 import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
 import { Transaction } from '@/types';
+import { useMounted } from '@/hooks/useMounted';
+
+// Force dynamic rendering to avoid pre-rendering issues with client-side hooks
+export const dynamic = 'force-dynamic';
 
 export default function CustomerDashboardPage() {
+  const isMounted = useMounted();
   const router = useRouter();
   const [user, setUser] = useState<{ name: string; email: string } | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -142,7 +147,7 @@ export default function CustomerDashboardPage() {
                 <div>
                   <div className="text-xs font-bold text-navy-900">{txn.merchantName}</div>
                   <div className="text-[10px] text-slate-500 font-mono">
-                    {txn.transactionId} • {new Date(txn.createdAt).toLocaleDateString()}
+                    {txn.transactionId} • {isMounted ? new Date(txn.createdAt).toLocaleDateString() : '...'}
                   </div>
                 </div>
                 <div className="text-right">

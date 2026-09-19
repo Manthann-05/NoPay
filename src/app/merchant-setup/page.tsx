@@ -1,5 +1,8 @@
 'use client';
 
+// Force dynamic rendering to avoid pre-rendering issues with client-side hooks
+export const dynamic = 'force-dynamic';
+
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Store, Building2, MapPin, ArrowRight, ShieldCheck } from 'lucide-react';

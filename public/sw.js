@@ -1,5 +1,5 @@
-const CACHE_NAME = 'nopay-cache-v2';
-const DYNAMIC_CACHE = 'nopay-dynamic-v2';
+const CACHE_NAME = 'nopay-cache-v3';
+const DYNAMIC_CACHE = 'nopay-dynamic-v3';
 
 /**
  * SECURITY: Only the PUBLIC app shell is precached at install time.
@@ -69,20 +69,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Next.js Static Assets (Cache First)
+  // Next.js Static Assets (Stale-While-Revalidate)
   if (url.pathname.startsWith('/_next/static/') || url.pathname.match(/\.(png|jpg|jpeg|svg|gif|woff2?|css|js)$/)) {
     event.respondWith(
-      caches.match(event.request).then((cachedResponse) => {
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-        return fetch(event.request).then((networkResponse) => {
-          if (networkResponse.ok) {
-            const clone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const cachedResponse = await cache.match(event.request);
+
+        // Trigger network fetch in background to update cache
+        const networkFetch = fetch(event.request).then((networkResponse) => {
+          if (networkResponse && networkResponse.ok) {
+            cache.put(event.request, networkResponse.clone());
           }
           return networkResponse;
-        });
+        }).catch(() => {});
+
+        // Return cached response if available, otherwise wait for network
+        return cachedResponse || networkFetch;
       })
     );
     return;

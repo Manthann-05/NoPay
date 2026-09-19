@@ -7,6 +7,9 @@ import { Transaction } from '@/types';
 import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
 import { ArrowLeft, Clock, CheckCircle2, ShoppingBag, Search, WifiOff, RefreshCw } from 'lucide-react';
 
+// Force dynamic rendering to avoid pre-rendering issues with client-side hooks
+export const dynamic = 'force-dynamic';
+
 export default function CustomerTransactionsPage() {
   const router = useRouter();
   const [transactions, setTransactions] = useState<Transaction[]>([]);

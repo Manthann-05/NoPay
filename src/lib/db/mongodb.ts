@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import dns from 'node:dns';
 import { getEnv } from '@/lib/env';
 
 /**
@@ -31,11 +32,24 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000,
     };
 
-    cached.promise = mongoose
-      .connect(MONGODB_URI, opts)
-      .then((mongooseInstance) => mongooseInstance);
+    cached.promise = mongoose.connect(MONGODB_URI, opts).catch(async (error: unknown) => {
+      // Some Windows/network DNS configurations reject SRV lookups through
+      // Node's default resolver even though the Atlas host is reachable.
+      // Retry once with public resolvers; non-SRV URIs are never affected.
+      const code = error && typeof error === 'object' && 'code' in error
+        ? (error as { code?: string }).code
+        : undefined;
+      if (!MONGODB_URI.startsWith('mongodb+srv://') || code !== 'ECONNREFUSED') {
+        throw error;
+      }
+
+      dns.setServers(['1.1.1.1', '8.8.8.8']);
+      return mongoose.connect(MONGODB_URI, opts);
+    });
   }
 
   try {

@@ -4,16 +4,16 @@ import { Product } from '@/models/Product';
 import { ProductSchema } from '@/lib/validation/schemas';
 import { getRequiredMerchantSession, authErrorResponse } from '@/lib/auth/apiGuards';
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getRequiredMerchantSession();
     const body = await req.json();
     const validated = ProductSchema.parse(body);
 
     await connectToDatabase();
-
+    const resolvedParams = await params;
     const product = await Product.findOne({
-      _id: params.id,
+      _id: resolvedParams.id,
       merchantId: session.merchantProfileId,
     });
 
@@ -39,12 +39,13 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getRequiredMerchantSession();
     await connectToDatabase();
+    const resolvedParams = await params;
     const product = await Product.findOneAndUpdate(
-      { _id: params.id, merchantId: session.merchantProfileId },
+      { _id: resolvedParams.id, merchantId: session.merchantProfileId },
       { active: false }
     );
 

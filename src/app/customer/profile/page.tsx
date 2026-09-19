@@ -6,6 +6,9 @@ import { RoleSwitcher } from '@/components/shared/RoleSwitcher';
 import { User, UserRole } from '@/types';
 import { User as UserIcon, Store, ArrowLeft, LogOut, ShieldCheck, Mail } from 'lucide-react';
 
+// Force dynamic rendering to avoid pre-rendering issues with client-side hooks
+export const dynamic = 'force-dynamic';
+
 export default function CustomerProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);

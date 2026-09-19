@@ -5,6 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Transaction } from '@/types';
 import { CheckCircle2, Clock, ShieldCheck, ArrowRight, RefreshCw, Home, FileText } from 'lucide-react';
 
+// Force dynamic rendering to avoid pre-rendering issues with client-side hooks
+export const dynamic = 'force-dynamic';
+
 function PaymentStatusContent() {
   const router = useRouter();
   const searchParams = useSearchParams();

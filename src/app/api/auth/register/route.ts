@@ -76,6 +76,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: err.errors[0].message }, { status: 400 });
     }
     console.error('Registration API Error:', err);
-    return NextResponse.json({ error: 'Failed to create user account' }, { status: 500 });
+    const isDatabaseError = err?.name === 'MongoServerSelectionError'
+      || err?.name === 'MongooseServerSelectionError'
+      || err?.code === 'ECONNREFUSED'
+      || err?.code === 'ENOTFOUND'
+      || err?.code === 'ETIMEDOUT'
+      || err?.syscall === 'querySrv';
+    return NextResponse.json(
+      {
+        error: isDatabaseError
+          ? 'Database unavailable. Check your Atlas network access, URI, and restart the dev server.'
+          : 'Failed to create user account',
+      },
+      { status: isDatabaseError ? 503 : 500 }
+    );
   }
 }

@@ -58,7 +58,7 @@ export function verifyToken(token: string): JwtPayload | null {
 }
 
 export async function getSessionUser(): Promise<JwtPayload | null> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const token = cookieStore.get(TOKEN_COOKIE_NAME)?.value;
   if (!token) return null;
   return verifyToken(token);
@@ -66,7 +66,7 @@ export async function getSessionUser(): Promise<JwtPayload | null> {
 
 export async function setSessionCookie(payload: JwtPayload): Promise<string> {
   const token = signToken(payload);
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   cookieStore.set(TOKEN_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -78,7 +78,7 @@ export async function setSessionCookie(payload: JwtPayload): Promise<string> {
 }
 
 export async function clearSessionCookie(): Promise<void> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   cookieStore.delete(TOKEN_COOKIE_NAME);
 }
 

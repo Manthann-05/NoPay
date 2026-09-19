@@ -1,6 +1,46 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  /* Colors - Navy Palette */
+  --color-navy-50: #f0f4f8;
+  --color-navy-100: #d9e2ec;
+  --color-navy-200: #bcccdc;
+  --color-navy-300: #9fb3c8;
+  --color-navy-400: #829ab1;
+  --color-navy-500: #627d98;
+  --color-navy-600: #486581;
+  --color-navy-700: #334e68;
+  --color-navy-800: #102a43;
+  --color-navy-900: #0b192c;
+  --color-navy-950: #060e1a;
+
+  /* Brand Colors */
+  --color-brand-blue: #2563eb;
+  --color-brand-dark-blue: #1d4ed8;
+  --color-brand-light-blue: #eff6ff;
+  --color-brand-accent: #3b82f6;
+  --color-brand-emerald: #10b981;
+  --color-brand-amber: #f59e0b;
+  --color-brand-rose: #ef4444;
+
+  /* Typography */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+
+  /* Shadows */
+  --shadow-card: 0 2px 8px -2px rgba(16, 42, 67, 0.08), 0 4px 16px -4px rgba(16, 42, 67, 0.04);
+  --shadow-card-hover: 0 8px 24px -4px rgba(16, 42, 67, 0.12), 0 4px 12px -2px rgba(16, 42, 67, 0.06);
+  --shadow-modal: 0 20px 40px -12px rgba(11, 25, 44, 0.25);
+
+  /* Animations */
+  --animate-pulse-subtle: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-scan-line: scan 2s linear infinite;
+
+  @keyframes scan {
+    0% { transform: translateY(0%); }
+    50% { transform: translateY(100%); }
+    100% { transform: translateY(0%); }
+  }
+}
 
 :root {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
@@ -9,6 +49,57 @@
   --color-surface: #ffffff;
   --color-bg: #f8fafc;
 }
+
+body {
+  color: #1e293b;
+  background-color: #f8fafc;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+@media (max-width: 768px) {
+  .mobile-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.navy-gradient {
+  background: linear-gradient(135deg, #0b192c 0%, #1e293b 100%);
+}
+
+.brand-gradient {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #3b82f6 100%);
+}
+
 
 body {
   color: #1e293b;

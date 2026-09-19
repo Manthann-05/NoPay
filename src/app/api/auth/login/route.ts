@@ -41,6 +41,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: err.errors[0].message }, { status: 400 });
     }
     console.error('Login API Error:', err);
-    return NextResponse.json({ error: 'Authentication failed' }, { status: 500 });
+    const isDatabaseError = err?.name === 'MongoServerSelectionError'
+      || err?.name === 'MongooseServerSelectionError'
+      || err?.code === 'ECONNREFUSED'
+      || err?.code === 'ENOTFOUND'
+      || err?.code === 'ETIMEDOUT'
+      || err?.syscall === 'querySrv';
+    return NextResponse.json(
+      {
+        error: isDatabaseError
+          ? 'Database unavailable. Check your Atlas network access, URI, and restart the dev server.'
+          : 'Authentication failed',
+      },
+      { status: isDatabaseError ? 503 : 500 }
+    );
   }
 }

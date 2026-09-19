@@ -8,6 +8,9 @@ import { Transaction } from '@/types';
 import { readScannedQr } from '@/lib/qr/scanHandoff';
 import { Store, CreditCard, ArrowLeft, ShieldCheck, WifiOff } from 'lucide-react';
 
+// Force dynamic rendering to avoid pre-rendering issues with client-side hooks
+export const dynamic = 'force-dynamic';
+
 export default function CustomerStaticPayPage() {
   const router = useRouter();
   const { isOnline } = useOnlineStatus();

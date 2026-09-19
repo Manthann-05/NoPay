@@ -21,6 +21,9 @@ import {
   Zap,
 } from 'lucide-react';
 
+// Force dynamic rendering to avoid pre-rendering issues with client-side hooks
+export const dynamic = 'force-dynamic';
+
 export default function MerchantDashboardPage() {
   const router = useRouter();
   const [stats, setStats] = useState({

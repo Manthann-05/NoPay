@@ -3,11 +3,12 @@ import { connectToDatabase } from '@/lib/db/mongodb';
 import { MerchantProfile } from '@/models/MerchantProfile';
 import { getRequiredSession, authErrorResponse } from '@/lib/auth/apiGuards';
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await getRequiredSession();
     await connectToDatabase();
-    const merchant = await MerchantProfile.findById(params.id).select('shopName area active');
+    const resolvedParams = await params;
+    const merchant = await MerchantProfile.findById(resolvedParams.id).select('shopName area active');
     if (!merchant || merchant.active === false) {
       return NextResponse.json({ error: 'Merchant not found' }, { status: 404 });
     }
