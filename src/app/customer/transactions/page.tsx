@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getOfflineTransactions } from '@/offline/queue';
 import { Transaction } from '@/types';
-import { ArrowLeft, Clock, CheckCircle2, ShoppingBag, ArrowUpRight, Search, WifiOff, RefreshCw } from 'lucide-react';
+import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
+import { ArrowLeft, Clock, CheckCircle2, ShoppingBag, Search, WifiOff, RefreshCw } from 'lucide-react';
 
 export default function CustomerTransactionsPage() {
   const router = useRouter();
@@ -112,13 +113,7 @@ export default function CustomerTransactionsPage() {
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                    t.status === 'PENDING_SYNC'
-                      ? 'bg-amber-50 text-amber-600'
-                      : t.status === 'RETRY_PENDING'
-                      ? 'bg-rose-50 text-rose-600'
-                      : 'bg-emerald-50 text-emerald-600'
-                  }`}
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center ${transactionStatusTone(t.status)}`}
                 >
                   {t.status === 'PENDING_SYNC' || t.status === 'RETRY_PENDING' ? (
                     <Clock className="w-5 h-5" />
@@ -130,19 +125,9 @@ export default function CustomerTransactionsPage() {
                   <div className="flex items-center gap-2">
                     <h4 className="text-sm font-bold text-navy-900">{t.merchantName}</h4>
                     <span
-                      className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md ${
-                        t.status === 'PENDING_SYNC'
-                          ? 'bg-amber-100 text-amber-800'
-                          : t.status === 'RETRY_PENDING'
-                          ? 'bg-rose-100 text-rose-800'
-                          : 'bg-emerald-100 text-emerald-800'
-                      }`}
+                      className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md ${transactionStatusTone(t.status)}`}
                     >
-                      {t.status === 'PENDING_SYNC'
-                        ? 'OFFLINE QUEUED'
-                        : t.status === 'RETRY_PENDING'
-                        ? 'RETRY PENDING'
-                        : 'CONFIRMED'}
+                      {transactionStatusLabel(t.status).toUpperCase()}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-400 font-mono">

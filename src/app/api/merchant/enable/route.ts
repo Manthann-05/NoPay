@@ -4,7 +4,7 @@ import { connectToDatabase } from '@/lib/db/mongodb';
 import { User } from '@/models/User';
 import { MerchantProfile } from '@/models/MerchantProfile';
 import { EnableMerchantSchema } from '@/lib/validation/schemas';
-import { encodeStaticMerchantQrPayload } from '@/lib/qr/payload';
+import { encodeStaticMerchantQr } from '@/lib/qr/payload';
 
 export async function POST(req: Request) {
   const session = await getSessionUser();
@@ -26,17 +26,16 @@ export async function POST(req: Request) {
     let merchantProfile = await MerchantProfile.findOne({ userId: user._id });
 
     if (!merchantProfile) {
-      const shopId = `SHOP-${Date.now().toString(36).toUpperCase()}`;
-      const staticQrPayload = encodeStaticMerchantQrPayload(shopId, validated.shopName);
-
       merchantProfile = await MerchantProfile.create({
         userId: user._id,
         shopName: validated.shopName,
         address: validated.address,
         area: validated.area,
-        staticQrPayload,
+        staticQrPayload: 'pending',
         version: 1,
       });
+      merchantProfile.staticQrPayload = encodeStaticMerchantQr(merchantProfile._id.toString());
+      await merchantProfile.save();
     }
 
     if (!user.roles.includes('MERCHANT')) {

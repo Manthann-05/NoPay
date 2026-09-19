@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import Razorpay from 'razorpay';
+import { getRequiredSession, authErrorResponse } from '@/lib/auth/apiGuards';
 
 export async function POST(req: Request) {
   try {
+    await getRequiredSession();
     const { amount, transactionId } = await req.json();
 
     if (!amount || Number(amount) <= 0) {
@@ -14,12 +16,10 @@ export async function POST(req: Request) {
 
     if (!keyId || !keySecret) {
       return NextResponse.json(
-        { error: 'Online payment processing is not configured. Payment verification requires Razorpay credentials.' },
+        { error: 'Online payment is not configured. Transactions can still be saved and synced.' },
         { status: 503 }
       );
     }
-
-    const orderId = `order_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
 
     const instance = new Razorpay({ key_id: keyId, key_secret: keySecret });
     const order = await instance.orders.create({
@@ -33,7 +33,10 @@ export async function POST(req: Request) {
       keyId,
       order,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    if (typeof err === 'object' && err && 'statusCode' in err) {
+      return authErrorResponse(err);
+    }
     console.error('Razorpay Create Order Error:', err);
     return NextResponse.json({ error: 'Failed to create payment order' }, { status: 500 });
   }

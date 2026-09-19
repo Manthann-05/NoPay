@@ -85,17 +85,17 @@ export function QrScannerModal({ onScanSuccess, onClose }: QrScannerModalProps) 
       });
       scannerRef.current = html5QrCode;
 
-      await html5QrCode.start(
-        { facingMode: 'environment' },
-        {
-          fps: 12,
-          qrbox: (viewfinderWidth, viewfinderHeight) => {
-            const minEdge = Math.min(viewfinderWidth, viewfinderHeight, window.innerWidth);
-            const size = Math.max(140, Math.min(Math.floor(minEdge * 0.72), 280));
-            return { width: size, height: size };
+        await html5QrCode.start(
+          { facingMode: 'environment' },
+          {
+            fps: 12,
+            qrbox: (viewfinderWidth, viewfinderHeight) => {
+              const minEdge = Math.min(viewfinderWidth, viewfinderHeight, window.innerWidth);
+              const size = Math.max(140, Math.min(Math.floor(minEdge * 0.72), 280));
+              return { width: size, height: size };
+            },
+            aspectRatio: 1.0,
           },
-          aspectRatio: 1.0,
-        },
         (decodedText) => {
           if (hasScannedRef.current) return;
 

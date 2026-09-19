@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { Transaction } from '@/models/Transaction';
+import { getRequiredSession, authErrorResponse } from '@/lib/auth/apiGuards';
 
 export async function POST(req: Request) {
   try {
+    const session = await getRequiredSession();
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, transactionId } = await req.json();
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !transactionId) {
@@ -14,7 +16,7 @@ export async function POST(req: Request) {
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
     if (!keySecret) {
       return NextResponse.json(
-        { error: 'Online payment verification is not configured. Add Razorpay credentials to enable server-side verification.' },
+        { error: 'Online payment verification is not configured.' },
         { status: 503 }
       );
     }
@@ -25,13 +27,16 @@ export async function POST(req: Request) {
       .digest('hex');
 
     if (generatedSignature !== razorpay_signature) {
-      return NextResponse.json({ error: 'Invalid payment signature verification failed' }, { status: 400 });
+      return NextResponse.json({ error: 'Payment could not be verified.' }, { status: 400 });
     }
 
     await connectToDatabase();
 
     const txn = await Transaction.findOneAndUpdate(
-      { transactionId },
+      {
+        transactionId,
+        customerId: session.userId,
+      },
       {
         status: 'CONFIRMED',
         paymentReference: razorpay_payment_id,
@@ -40,13 +45,20 @@ export async function POST(req: Request) {
       { new: true }
     );
 
+    if (!txn) {
+      return NextResponse.json({ error: 'Transaction not found.' }, { status: 404 });
+    }
+
     return NextResponse.json({
       success: true,
-      message: 'Payment signature verified server-side and transaction confirmed!',
+      message: 'Transaction Confirmed',
       transaction: txn,
     });
-  } catch (err) {
+  } catch (err: unknown) {
+    if (typeof err === 'object' && err && 'statusCode' in err) {
+      return authErrorResponse(err);
+    }
     console.error('Payment Verification Error:', err);
-    return NextResponse.json({ error: 'Server-side payment verification failed' }, { status: 500 });
+    return NextResponse.json({ error: 'Payment verification failed' }, { status: 500 });
   }
 }

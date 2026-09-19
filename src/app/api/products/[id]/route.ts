@@ -1,16 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getSessionUser } from '@/lib/auth/jwt';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { Product } from '@/models/Product';
 import { ProductSchema } from '@/lib/validation/schemas';
+import { getRequiredMerchantSession, authErrorResponse } from '@/lib/auth/apiGuards';
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
-  const session = await getSessionUser();
-  if (!session || !session.merchantProfileId || session.activeRole !== 'MERCHANT') {
-    return NextResponse.json({ error: 'Merchant authorization required' }, { status: 403 });
-  }
-
   try {
+    const session = await getRequiredMerchantSession();
     const body = await req.json();
     const validated = ProductSchema.parse(body);
 
@@ -29,21 +25,23 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     await product.save();
 
     return NextResponse.json({ message: 'Product updated successfully', product });
-  } catch (err: any) {
-    if (err.name === 'ZodError') {
-      return NextResponse.json({ error: err.errors[0].message }, { status: 400 });
+  } catch (err: unknown) {
+    if (typeof err === 'object' && err && 'statusCode' in err) {
+      return authErrorResponse(err);
+    }
+    if (typeof err === 'object' && err && (err as { name?: string }).name === 'ZodError') {
+      return NextResponse.json(
+        { error: (err as { errors: { message: string }[] }).errors[0].message },
+        { status: 400 }
+      );
     }
     return NextResponse.json({ error: 'Failed to update product' }, { status: 500 });
   }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
-  const session = await getSessionUser();
-  if (!session || !session.merchantProfileId || session.activeRole !== 'MERCHANT') {
-    return NextResponse.json({ error: 'Merchant authorization required' }, { status: 403 });
-  }
-
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
   try {
+    const session = await getRequiredMerchantSession();
     await connectToDatabase();
     const product = await Product.findOneAndUpdate(
       { _id: params.id, merchantId: session.merchantProfileId },
@@ -55,7 +53,10 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     }
 
     return NextResponse.json({ message: 'Product deleted' });
-  } catch (err) {
+  } catch (err: unknown) {
+    if (typeof err === 'object' && err && 'statusCode' in err) {
+      return authErrorResponse(err);
+    }
     return NextResponse.json({ error: 'Failed to delete product' }, { status: 500 });
   }
 }

@@ -10,6 +10,9 @@ export async function getRequiredSession(): Promise<JwtPayload> {
 export async function getRequiredMerchantSession(): Promise<JwtPayload> {
   const session = await getSessionUser();
   requireMerchantSession(session);
+  if (!session.merchantProfileId) {
+    throw Object.assign(new Error('Merchant authorization required'), { statusCode: 403 });
+  }
   return session;
 }
 

@@ -42,7 +42,13 @@ export async function GET(req: Request) {
       user: payload,
     });
   } catch (err) {
-    return NextResponse.json({ authenticated: true, user: session });
+    // SECURITY: Never report an authenticated state when the database
+    // cannot be reached — the client falls back to the local session.
+    console.error('Auth me DB error:', err);
+    return NextResponse.json(
+      { authenticated: false, user: null, error: 'Could not verify session. Please try again.' },
+      { status: 503 }
+    );
   }
 }
 
@@ -58,15 +64,23 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
     }
 
-    if (activeRole === 'MERCHANT' && !session.roles.includes('MERCHANT')) {
+    await connectToDatabase();
+    // SECURITY: Re-verify roles against the database, never trust only the
+    // JWT claim. A stale or tampered token must not grant merchant access.
+    const dbUser = await User.findById(session.userId).select('roles');
+    if (!dbUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    if (activeRole === 'MERCHANT' && !dbUser.roles.includes('MERCHANT')) {
       return NextResponse.json({ error: 'User does not possess MERCHANT role' }, { status: 403 });
     }
 
-    await connectToDatabase();
     await User.findByIdAndUpdate(session.userId, { activeRole });
 
     const updatedSession = {
       ...session,
+      roles: dbUser.roles,
       activeRole,
     };
 

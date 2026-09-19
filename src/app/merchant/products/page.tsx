@@ -2,19 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { Product } from '@/types';
-import { Package, Plus, Edit, Trash2, Search, Scan, CheckCircle2, X } from 'lucide-react';
-import { QrScannerModal } from '@/components/qr/QrScannerModal';
-
-const DEFAULT_PRODUCTS: Product[] = [
-  { _id: 'p1', merchantId: 'm1', name: 'Fresh Milk 1L', price: 60, stock: 45, category: 'Dairy', barcode: '8901234567890', active: true, createdAt: '', updatedAt: '' },
-  { _id: 'p2', merchantId: 'm1', name: 'Whole Wheat Bread', price: 45, stock: 20, category: 'Bakery', barcode: '8901234567891', active: true, createdAt: '', updatedAt: '' },
-  { _id: 'p3', merchantId: 'm1', name: 'Potato Chips 100g', price: 30, stock: 80, category: 'Snacks', barcode: '8901234567892', active: true, createdAt: '', updatedAt: '' },
-  { _id: 'p4', merchantId: 'm1', name: 'Sparkling Soda 500ml', price: 40, stock: 35, category: 'Beverages', barcode: '8901234567893', active: true, createdAt: '', updatedAt: '' },
-  { _id: 'p5', merchantId: 'm1', name: 'Instant Coffee 100g', price: 180, stock: 15, category: 'Pantry', barcode: '8901234567894', active: true, createdAt: '', updatedAt: '' },
-];
+import { Package, Plus, Edit, Trash2, Search, Scan, X } from 'lucide-react';
+import { BarcodeScanner } from '@/components/qr/BarcodeScanner';
 
 export default function MerchantProductsPage() {
-  const [products, setProducts] = useState<Product[]>(DEFAULT_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [catalogMessage, setCatalogMessage] = useState<string | null>(null);
   const [search, setSearch] = useState<string>('');
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -30,14 +23,40 @@ export default function MerchantProductsPage() {
   const [scannerOpen, setScannerOpen] = useState(false);
 
   useEffect(() => {
-    fetch('/api/products')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.products && data.products.length > 0) {
-          setProducts(data.products);
+    async function loadProducts() {
+      try {
+        const { offlineDb } = await import('@/offline/db');
+        const local = await offlineDb.products.toArray();
+        if (local.length > 0) {
+          setProducts(local);
+        } else if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          setCatalogMessage('No offline products available. Connect to the internet to refresh your catalog.');
         }
-      })
-      .catch((e) => console.warn('Using offline product defaults', e));
+
+        if (typeof navigator !== 'undefined' && navigator.onLine) {
+          const res = await fetch('/api/products');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.products) {
+              setProducts(data.products);
+              await offlineDb.products.clear();
+              if (data.products.length > 0) {
+                await offlineDb.products.bulkPut(data.products);
+              }
+              setCatalogMessage(null);
+            }
+          } else if (local.length === 0) {
+            setCatalogMessage('No offline products available. Connect to the internet to refresh your catalog.');
+          }
+        }
+      } catch {
+        if (products.length === 0) {
+          setCatalogMessage('No offline products available. Connect to the internet to refresh your catalog.');
+        }
+      }
+    }
+    void loadProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleOpenAdd = () => {
@@ -165,7 +184,14 @@ export default function MerchantProductsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-navy-900">
-              {filteredProducts.map((p) => (
+              {filteredProducts.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-xs text-slate-500">
+                    {catalogMessage || 'No products in your catalog yet. Add a product to get started.'}
+                  </td>
+                </tr>
+              ) : (
+                filteredProducts.map((p) => (
                 <tr key={p._id} className="hover:bg-slate-50/50">
                   <td className="p-4 font-bold">{p.name}</td>
                   <td className="p-4">
@@ -199,7 +225,7 @@ export default function MerchantProductsPage() {
                     </button>
                   </td>
                 </tr>
-              ))}
+                )))}
             </tbody>
           </table>
         </div>
@@ -307,8 +333,8 @@ export default function MerchantProductsPage() {
       )}
 
       {scannerOpen && (
-        <QrScannerModal
-          onScanSuccess={(payload, rawText) => {
+        <BarcodeScanner
+          onDetected={(rawText) => {
             setBarcode(rawText);
             setScannerOpen(false);
           }}

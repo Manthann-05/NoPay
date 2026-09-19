@@ -4,7 +4,7 @@ import { User } from '@/models/User';
 import { MerchantProfile } from '@/models/MerchantProfile';
 import { hashPassword, setSessionCookie } from '@/lib/auth/jwt';
 import { RegisterSchema } from '@/lib/validation/schemas';
-import { encodeStaticMerchantQrPayload } from '@/lib/qr/payload';
+import { encodeStaticMerchantQr } from '@/lib/qr/payload';
 
 export async function POST(req: Request) {
   try {
@@ -36,17 +36,17 @@ export async function POST(req: Request) {
     let merchantProfileId: string | undefined;
 
     if (validated.initialRole === 'MERCHANT' && validated.shopName) {
-      const shopId = `SHOP-${Date.now().toString(36).toUpperCase()}`;
-      const staticQrPayload = encodeStaticMerchantQrPayload(shopId, validated.shopName);
-
       const merchantProfile = await MerchantProfile.create({
         userId: newUser._id,
         shopName: validated.shopName,
         address: validated.address || 'Standard Location',
         area: validated.area || 'City Central',
-        staticQrPayload,
+        staticQrPayload: 'pending',
         version: 1,
       });
+
+      merchantProfile.staticQrPayload = encodeStaticMerchantQr(merchantProfile._id.toString());
+      await merchantProfile.save();
 
       merchantProfileId = merchantProfile._id.toString();
       newUser.merchantProfileId = merchantProfile._id;

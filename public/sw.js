@@ -1,19 +1,15 @@
 const CACHE_NAME = 'nopay-cache-v2';
 const DYNAMIC_CACHE = 'nopay-dynamic-v2';
 
+/**
+ * SECURITY: Only the PUBLIC app shell is precached at install time.
+ * Authenticated pages (customer/merchant) are runtime-cached only after
+ * an authorized user has actually visited them (see navigation handler).
+ */
 const APP_SHELL = [
   '/',
   '/login',
   '/register',
-  '/customer/dashboard',
-  '/customer/scan',
-  '/customer/transactions',
-  '/customer/payment',
-  '/merchant/dashboard',
-  '/merchant/billing',
-  '/merchant/static-qr',
-  '/merchant/sync',
-  '/merchant/transactions',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',

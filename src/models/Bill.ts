@@ -9,6 +9,7 @@ export interface IBillItem {
 
 export interface IBill extends Document {
   billId: string;
+  transactionId?: string;
   merchantId: mongoose.Types.ObjectId;
   merchantName: string;
   customerId?: mongoose.Types.ObjectId;
@@ -33,6 +34,7 @@ const BillItemSchema = new Schema<IBillItem>({
 const BillSchema = new Schema<IBill>(
   {
     billId: { type: String, required: true, unique: true, index: true },
+    transactionId: { type: String, index: true },
     merchantId: { type: Schema.Types.ObjectId, ref: 'MerchantProfile', required: true, index: true },
     merchantName: { type: String, required: true },
     customerId: { type: Schema.Types.ObjectId, ref: 'User' },

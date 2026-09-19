@@ -4,8 +4,20 @@ import { Product } from '@/models/Product';
 import { User } from '@/models/User';
 import { MerchantProfile } from '@/models/MerchantProfile';
 import { hashPassword } from '@/lib/auth/jwt';
+import { encodeStaticMerchantQr } from '@/lib/qr/payload';
 
+/**
+ * SECURITY: Seeding is a development/demo convenience only.
+ * It is disabled in production and never returns credentials.
+ */
 export async function POST() {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json(
+      { message: 'Database seeding is disabled in production.' },
+      { status: 404 }
+    );
+  }
+
   try {
     await connectToDatabase();
 
@@ -28,13 +40,20 @@ export async function POST() {
         shopName: 'NoPay Supermart & Grocery',
         address: '100 Innovation Way, Tech Park',
         area: 'Downtown Metro',
-        staticQrPayload: `MERCHANT:v1:${demoMerchant._id}:NoPay Supermart & Grocery`,
+        staticQrPayload: 'pending',
       });
+
+      merchantProfile.staticQrPayload = encodeStaticMerchantQr(merchantProfile._id.toString());
+      await merchantProfile.save();
 
       demoMerchant.merchantProfileId = merchantProfile._id;
       await demoMerchant.save();
     } else {
       merchantProfile = await MerchantProfile.findOne({ userId: demoMerchant._id });
+      if (merchantProfile && (!merchantProfile.staticQrPayload || merchantProfile.staticQrPayload === 'pending' || !merchantProfile.staticQrPayload.startsWith('NOPAY://'))) {
+        merchantProfile.staticQrPayload = encodeStaticMerchantQr(merchantProfile._id.toString());
+        await merchantProfile.save();
+      }
     }
 
     // 2. Seed Default Product Catalog
@@ -57,10 +76,9 @@ export async function POST() {
     }
 
     return NextResponse.json({
-      message: 'Database seeded successfully!',
+      message: 'Database seeded successfully! Check the seed script output for demo credentials.',
       merchant: {
         email: 'merchant@nopay.com',
-        password: 'password123',
         shopName: merchantProfile?.shopName,
       },
       productCount: sampleProducts.length,

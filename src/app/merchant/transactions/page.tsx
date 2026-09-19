@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { getOfflineTransactions } from '@/offline/queue';
 import { Transaction } from '@/types';
+import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
 import { FileText, Clock, CheckCircle2, Search, RefreshCw, X, ArrowUpRight } from 'lucide-react';
 
 export default function MerchantTransactionsPage() {
@@ -152,27 +153,14 @@ export default function MerchantTransactionsPage() {
                     <td className="p-4 font-black text-brand-blue">₹{t.amount.toFixed(2)}</td>
                     <td className="p-4">
                       <span
-                        className={`px-2.5 py-1 text-[10px] font-extrabold rounded-md flex items-center gap-1 w-fit ${
-                          t.status === 'PENDING_SYNC'
-                            ? 'bg-amber-100 text-amber-800'
-                            : t.status === 'RETRY_PENDING'
-                            ? 'bg-rose-100 text-rose-800'
-                            : 'bg-emerald-100 text-emerald-800'
-                        }`}
+                        className={`px-2.5 py-1 text-[10px] font-extrabold rounded-md flex items-center gap-1 w-fit ${transactionStatusTone(t.status)}`}
                       >
-                        {t.status === 'PENDING_SYNC' ? (
-                          <>
-                            <Clock className="w-3 h-3" /> PENDING SYNC
-                          </>
-                        ) : t.status === 'RETRY_PENDING' ? (
-                          <>
-                            <Clock className="w-3 h-3" /> RETRY PENDING
-                          </>
+                        {t.status === 'PENDING_SYNC' || t.status === 'RETRY_PENDING' ? (
+                          <Clock className="w-3 h-3" />
                         ) : (
-                          <>
-                            <CheckCircle2 className="w-3 h-3" /> CONFIRMED
-                          </>
+                          <CheckCircle2 className="w-3 h-3" />
                         )}
+                        {transactionStatusLabel(t.status).toUpperCase()}
                       </span>
                     </td>
                     <td className="p-4 text-slate-500 font-mono text-[11px]">

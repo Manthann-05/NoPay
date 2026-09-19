@@ -103,9 +103,11 @@ export function parseNoPayQr(raw: string): NoPayQrResult | null {
     // Must start with NOPAY:// (case-insensitive)
     if (!trimmed.toUpperCase().startsWith(NOPAY_SCHEME)) return null;
 
-    // Strip scheme and parse as URL
-    // Replace NOPAY:// with a dummy http:// for URL parsing
-    const asUrl = 'http://' + trimmed.slice(NOPAY_SCHEME.length);
+    // Strip scheme and parse as URL.
+    // NOTE: We must prefix a dummy HOST, not just 'http://' — otherwise the
+    // first path segment (the version, e.g. 'v1') is consumed as the hostname
+    // and disappears from pathname, which would make every valid QR unparseable.
+    const asUrl = 'http://qr.nopay.internal/' + trimmed.slice(NOPAY_SCHEME.length);
 
     let parsed: URL;
     try {
@@ -119,7 +121,7 @@ export function parseNoPayQr(raw: string): NoPayQrResult | null {
     // parts[0] = version, parts[1] = type, parts[2] = id
     if (parts.length < 3) return null;
 
-    const version = parts[0];
+    const version = parts[0].toLowerCase(); // case-insensitive version tag
     const qrType = parts[1].toUpperCase();
     const id = parts.slice(2).join('/'); // in case id contains '/'
 
