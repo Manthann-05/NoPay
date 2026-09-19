@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { QrCode, History, RefreshCw, Smartphone, Store, ShieldCheck, ArrowRight, Zap, CheckCircle2, Clock } from 'lucide-react';
 import { QrScannerModal } from '@/components/qr/QrScannerModal';
 import { getAllLocalTransactions } from '@/offline/queue';
-import { NoPayQrResult } from '@/lib/qr/payload';
+import { ScannedQrResult } from '@/lib/qr/payload';
 import { storeScannedQrRaw } from '@/lib/qr/scanHandoff';
 import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
 import { Transaction } from '@/types';
@@ -60,11 +60,11 @@ export default function CustomerDashboardPage() {
     loadData();
   }, []);
 
-  const handleQrDetected = (result: NoPayQrResult, rawText: string) => {
+  const handleQrDetected = (result: ScannedQrResult, rawText: string) => {
     setScannerOpen(false);
     storeScannedQrRaw(rawText);
 
-    if (result.type === 'MERCHANT') {
+    if (result.type === 'MERCHANT' || result.type === 'EXTERNAL') {
       router.push('/customer/static-pay');
     } else {
       router.push(`/customer/bill/${result.billId}`);

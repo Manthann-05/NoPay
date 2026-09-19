@@ -1,5 +1,5 @@
-const CACHE_NAME = 'nopay-cache-v3';
-const DYNAMIC_CACHE = 'nopay-dynamic-v3';
+const CACHE_NAME = 'nopay-cache-v4';
+const DYNAMIC_CACHE = 'nopay-dynamic-v4';
 
 /**
  * SECURITY: Only the PUBLIC app shell is precached at install time.

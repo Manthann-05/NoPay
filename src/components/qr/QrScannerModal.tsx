@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { parseNoPayQr, NoPayQrResult } from '@/lib/qr/payload';
+import { parseScannedQr, ScannedQrResult } from '@/lib/qr/payload';
 import { Image as ImageIcon, AlertCircle, QrCode, X } from 'lucide-react';
 
 interface QrScannerModalProps {
-  onScanSuccess: (result: NoPayQrResult, rawText: string) => void;
+  onScanSuccess: (result: ScannedQrResult, rawText: string) => void;
   onClose: () => void;
 }
 
@@ -99,17 +99,17 @@ export function QrScannerModal({ onScanSuccess, onClose }: QrScannerModalProps) 
         (decodedText) => {
           if (hasScannedRef.current) return;
 
-          const result = parseNoPayQr(decodedText);
+          const result = parseScannedQr(decodedText);
           if (result) {
             hasScannedRef.current = true;
-            setScanStatus('NoPay QR detected');
+            setScanStatus(result.type === 'EXTERNAL' ? 'Payment QR detected' : 'NoPay QR detected');
             stopCamera().then(() => {
               if (isMountedRef.current) {
                 onScanSuccessRef.current(result, decodedText);
               }
             });
           } else {
-            setScanStatus('QR not recognized — point at a NoPay Merchant or Bill QR');
+            setScanStatus('QR not recognized — point at a valid payment QR');
           }
         },
         () => {
@@ -176,7 +176,7 @@ export function QrScannerModal({ onScanSuccess, onClose }: QrScannerModalProps) 
       });
       try {
         const result = await scanner.scanFile(file, false);
-        const parsed = parseNoPayQr(result);
+        const parsed = parseScannedQr(result);
         if (parsed) {
           onScanSuccessRef.current(parsed, result);
         } else {

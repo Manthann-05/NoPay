@@ -14,7 +14,12 @@ export const dynamic = 'force-dynamic';
 export default function CustomerStaticPayPage() {
   const router = useRouter();
   const { isOnline } = useOnlineStatus();
-  const [merchant, setMerchant] = useState<{ merchantId: string; merchantName: string } | null>(null);
+  const [merchant, setMerchant] = useState<{
+    merchantId: string;
+    merchantName: string;
+    external?: boolean;
+    scheme?: string;
+  } | null>(null);
   const [amount, setAmount] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
@@ -22,15 +27,23 @@ export default function CustomerStaticPayPage() {
 
   useEffect(() => {
     const result = readScannedQr();
-    if (!result || result.type !== 'MERCHANT') {
-      setError('QR code not recognized. Please scan a valid NoPay Merchant QR.');
+    if (!result || (result.type !== 'MERCHANT' && result.type !== 'EXTERNAL')) {
+      setError('QR code not recognized. Please scan a valid payment QR.');
       return;
     }
 
-    setMerchant({
-      merchantId: result.merchantId,
-      merchantName: 'Merchant',
-    });
+    if (result.type === 'EXTERNAL') {
+      setMerchant({
+        merchantId: `EXTERNAL-${result.scheme}`,
+        merchantName: result.merchantName,
+        external: true,
+        scheme: result.scheme,
+      });
+      if (result.presetAmount) setAmount(result.presetAmount.toFixed(2));
+      return;
+    }
+
+    setMerchant({ merchantId: result.merchantId, merchantName: 'Merchant' });
 
     if (typeof navigator !== 'undefined' && navigator.onLine) {
       fetch(`/api/merchants/${encodeURIComponent(result.merchantId)}`)
@@ -61,6 +74,28 @@ export default function CustomerStaticPayPage() {
 
     setLoading(true);
     setError(null);
+
+    // External bank/UPI QRs are UI-only until the payment backend is wired.
+    if (merchant.external) {
+      const transactionId = `UI-TXN-${Date.now()}`;
+      sessionStorage.setItem(
+        'nopay_last_txn',
+        JSON.stringify({
+          transactionId,
+          merchantId: merchant.merchantId,
+          merchantName: merchant.merchantName,
+          customerName: 'Customer',
+          amount: numAmount,
+          type: 'STATIC_QR',
+          status: 'CONFIRMED',
+          idempotencyKey: transactionId,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+      );
+      router.push('/customer/payment?status=confirmed');
+      return;
+    }
 
     const txnId = `TXN-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
     const idempotencyKey = `IDEM-${txnId}`;
@@ -157,7 +192,7 @@ export default function CustomerStaticPayPage() {
             </div>
             <div>
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                Paying To
+                {merchant.external ? `${merchant.scheme} payment QR` : 'Paying To'}
               </span>
               <h3 className="text-lg font-black text-navy-900 leading-snug">{merchant.merchantName}</h3>
             </div>

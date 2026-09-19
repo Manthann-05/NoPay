@@ -61,6 +61,41 @@ export interface NoPayBillQrResult {
 
 export type NoPayQrResult = NoPayMerchantQrResult | NoPayBillQrResult;
 
+export interface ExternalQrResult {
+  type: 'EXTERNAL';
+  raw: string;
+  scheme: string;
+  merchantName: string;
+  presetAmount?: number;
+}
+
+export type ScannedQrResult = NoPayQrResult | ExternalQrResult;
+
+/** Accept standard UPI/bank QR payloads as a UI-only payment destination. */
+export function parseScannedQr(raw: string): ScannedQrResult | null {
+  const noPayResult = parseNoPayQr(raw);
+  if (noPayResult) return noPayResult;
+
+  const value = raw.trim();
+  if (!value) return null;
+
+  let scheme = 'QR';
+  let merchantName = 'External payment QR';
+  let presetAmount: number | undefined;
+  try {
+    const url = new URL(value);
+    scheme = url.protocol.replace(':', '').toUpperCase() || scheme;
+    const name = url.searchParams.get('pn') || url.searchParams.get('name');
+    const amount = Number(url.searchParams.get('am'));
+    if (name) merchantName = name;
+    if (Number.isFinite(amount) && amount > 0) presetAmount = amount;
+  } catch {
+    // Bank QR payloads are not always URL-shaped; preserve the raw value.
+  }
+
+  return { type: 'EXTERNAL', raw: value, scheme, merchantName, presetAmount };
+}
+
 // ─── Base64url helpers ───────────────────────────────────────────────────────
 
 function toBase64Url(str: string): string {

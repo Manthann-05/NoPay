@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { QrCode, Lock, Mail, User, Store, ArrowRight, AlertCircle, MapPin } from 'lucide-react';
+import { getLocalSession } from '@/offline/session';
 
 // Force dynamic rendering to avoid pre-rendering issues with client-side hooks
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,39 @@ export default function RegisterPage() {
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function redirectAuthenticatedUser() {
+      try {
+        const response = await fetch('/api/auth/me', { cache: 'no-store' });
+        if (response.ok) {
+          const data = await response.json();
+          if (!cancelled && data.authenticated && data.user) {
+            router.replace(data.user.activeRole === 'MERCHANT'
+              ? '/merchant/dashboard'
+              : '/customer/dashboard');
+            return;
+          }
+        }
+      } catch {
+        // Fall back to the offline session below.
+      }
+
+      const session = await getLocalSession();
+      if (!cancelled && session?.userId) {
+        router.replace(session.activeRole === 'MERCHANT' && session.roles.includes('MERCHANT')
+          ? '/merchant/dashboard'
+          : '/customer/dashboard');
+      }
+    }
+
+    void redirectAuthenticatedUser();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,12 +104,7 @@ export default function RegisterPage() {
         console.warn('Could not save offline session during registration', err);
       }
 
-      if (initialRole === 'MERCHANT') {
-        router.push('/merchant/dashboard');
-      } else {
-        router.push('/customer/dashboard');
-      }
-      router.refresh();
+      router.replace(initialRole === 'MERCHANT' ? '/merchant/dashboard' : '/customer/dashboard');
     } catch (err) {
       setError('An error occurred during registration');
     } finally {

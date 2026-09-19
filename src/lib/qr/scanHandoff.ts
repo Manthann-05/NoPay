@@ -1,4 +1,4 @@
-import { parseNoPayQr, type NoPayQrResult } from '@/lib/qr/payload';
+import { parseScannedQr, type ScannedQrResult } from '@/lib/qr/payload';
 
 const SCANNED_QR_KEY = 'nopay_scanned_qr';
 
@@ -7,10 +7,10 @@ export function storeScannedQrRaw(rawText: string): void {
   sessionStorage.setItem(SCANNED_QR_KEY, rawText);
 }
 
-export function readScannedQr(): NoPayQrResult | null {
+export function readScannedQr(): ScannedQrResult | null {
   const raw = sessionStorage.getItem(SCANNED_QR_KEY);
   if (!raw) return null;
-  return parseNoPayQr(raw);
+  return parseScannedQr(raw);
 }
 
 export function clearScannedQr(): void {

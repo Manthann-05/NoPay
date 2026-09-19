@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { QrScannerModal } from '@/components/qr/QrScannerModal';
-import { NoPayQrResult } from '@/lib/qr/payload';
+import { ScannedQrResult } from '@/lib/qr/payload';
 import { storeScannedQrRaw } from '@/lib/qr/scanHandoff';
 import { QrCode, ArrowLeft } from 'lucide-react';
 
@@ -14,13 +14,22 @@ export default function CustomerScanPage() {
   const router = useRouter();
   const [scannerOpen, setScannerOpen] = useState(true);
 
-  const handleScanSuccess = (result: NoPayQrResult, rawText: string) => {
-    storeScannedQrRaw(rawText);
+  const handleScanSuccess = (result: ScannedQrResult, rawText: string) => {
+    try {
+      storeScannedQrRaw(rawText);
+      setScannerOpen(false);
 
-    if (result.type === 'MERCHANT') {
-      router.push('/customer/static-pay');
-    } else {
-      router.push(`/customer/bill/${result.billId}`);
+      // Replace the scanner route so the payment form is the next screen
+      // and a browser refresh cannot reopen the camera modal.
+      window.setTimeout(() => {
+        if (result.type === 'MERCHANT' || result.type === 'EXTERNAL') {
+          router.replace('/customer/static-pay');
+        } else {
+          router.replace(`/customer/bill/${encodeURIComponent(result.billId)}`);
+        }
+      }, 0);
+    } catch {
+      setScannerOpen(false);
     }
   };
 
