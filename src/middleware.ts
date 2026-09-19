@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifyEdgeJwt } from '@/lib/auth/edgeJwt';
+import { getEnv } from '@/lib/env';
 
 const TOKEN_COOKIE_NAME = 'nopay_session';
 
@@ -16,7 +17,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const token = request.cookies.get(TOKEN_COOKIE_NAME)?.value;
-  const secret = process.env.AUTH_SECRET;
+  const secret = getEnv().AUTH_SECRET;
 
   if (!token || !secret) {
     const loginUrl = new URL('/login', request.url);

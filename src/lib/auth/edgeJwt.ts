@@ -24,6 +24,13 @@ function base64UrlToUint8Array(base64Url: string): Uint8Array {
   return output;
 }
 
+function base64UrlToArrayBuffer(base64Url: string): ArrayBuffer {
+  const bytes = base64UrlToUint8Array(base64Url);
+  const arrayBuffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(arrayBuffer).set(bytes);
+  return arrayBuffer;
+}
+
 export async function verifyEdgeJwt(token: string, secret: string): Promise<EdgeJwtPayload | null> {
   try {
     const parts = token.split('.');
@@ -41,13 +48,13 @@ export async function verifyEdgeJwt(token: string, secret: string): Promise<Edge
     const valid = await crypto.subtle.verify(
       'HMAC',
       key,
-      base64UrlToUint8Array(parts[2]),
+      base64UrlToArrayBuffer(parts[2]),
       encoder.encode(`${parts[0]}.${parts[1]}`)
     );
 
     if (!valid) return null;
 
-    const payloadJson = new TextDecoder().decode(base64UrlToUint8Array(parts[1]));
+    const payloadJson = new TextDecoder().decode(base64UrlToArrayBuffer(parts[1]));
     const payload = JSON.parse(payloadJson) as EdgeJwtPayload;
 
     if (payload.exp && payload.exp * 1000 < Date.now()) {

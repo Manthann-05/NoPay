@@ -23,13 +23,19 @@ export async function POST(req: Request) {
 
     await connectToDatabase();
 
-    // 1. IDEMPOTENCY CHECK: Find if transaction with idempotencyKey already exists
+    const merchantProfileId = session.merchantProfileId;
+    if (merchantProfileId && validated.merchantId && String(validated.merchantId) !== String(merchantProfileId)) {
+      return NextResponse.json(
+        { success: false, error: 'Merchant identity mismatch. This transaction does not belong to your merchant profile.' },
+        { status: 403 }
+      );
+    }
+
     const existingTxn = await Transaction.findOne({ idempotencyKey: validated.idempotencyKey });
 
     if (existingTxn) {
       console.log(`⚡ Idempotency key match found for ${validated.idempotencyKey}. Returning existing record.`);
 
-      // Log sync attempt
       await SyncLog.create({
         transactionId: existingTxn.transactionId,
         idempotencyKey: validated.idempotencyKey,
@@ -46,7 +52,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // 2. Fetch authoritative Merchant Profile
     let merchantName = validated.merchantName || 'NoPay Merchant';
     if (mongoose.Types.ObjectId.isValid(validated.merchantId)) {
       const profile = await MerchantProfile.findOne({
@@ -60,24 +65,28 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3. If it's a Bill QR, verify bill existence & server total
     let validatedAmount = validated.amount;
     let billSummary;
 
     if (validated.billId) {
       const bill = await Bill.findOne({ billId: validated.billId });
-      if (bill) {
-        validatedAmount = bill.total; // Enforce authoritative server bill total
-        billSummary = {
-          itemsCount: bill.items.length,
-          total: bill.total,
-        };
-        bill.status = 'PAID';
-        await bill.save();
+      if (!bill) {
+        return NextResponse.json({ success: false, error: 'Bill not found for this transaction.' }, { status: 404 });
       }
+
+      if (String(bill.merchantId) !== String(validated.merchantId)) {
+        return NextResponse.json({ success: false, error: 'This bill does not belong to the claimed merchant.' }, { status: 403 });
+      }
+
+      validatedAmount = Number(bill.total);
+      billSummary = {
+        itemsCount: bill.items.length,
+        total: bill.total,
+      };
+      bill.status = 'PAID';
+      await bill.save();
     }
 
-    // 4. Create new synchronized Transaction record using session user identity
     const customerId = session.userId;
     const customerName = session.name;
 
@@ -91,13 +100,12 @@ export async function POST(req: Request) {
       billSummary,
       amount: validatedAmount,
       type: validated.type,
-      status: 'CONFIRMED', // Mark confirmed upon successful server sync & validation
+      status: 'CONFIRMED',
       idempotencyKey: validated.idempotencyKey,
       offlineCreated: validated.offlineCreated,
       syncedAt: new Date(),
     });
 
-    // 5. Record Sync Log
     await SyncLog.create({
       transactionId: newTxn.transactionId,
       idempotencyKey: validated.idempotencyKey,

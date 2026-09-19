@@ -7,31 +7,29 @@ export async function POST(req: Request) {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, transactionId } = await req.json();
 
-    if (!razorpay_order_id || !razorpay_payment_id || !transactionId) {
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !transactionId) {
       return NextResponse.json({ error: 'Missing payment verification details' }, { status: 400 });
     }
 
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || 'nopay_razorpay_secret_456';
-
-    let isValid = true;
-
-    // Perform HMAC signature check if real signature provided
-    if (razorpay_signature) {
-      const generatedSignature = crypto
-        .createHmac('sha256', keySecret)
-        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-        .digest('hex');
-
-      isValid = generatedSignature === razorpay_signature || razorpay_signature.startsWith('simulated_');
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    if (!keySecret) {
+      return NextResponse.json(
+        { error: 'Online payment verification is not configured. Add Razorpay credentials to enable server-side verification.' },
+        { status: 503 }
+      );
     }
 
-    if (!isValid) {
+    const generatedSignature = crypto
+      .createHmac('sha256', keySecret)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest('hex');
+
+    if (generatedSignature !== razorpay_signature) {
       return NextResponse.json({ error: 'Invalid payment signature verification failed' }, { status: 400 });
     }
 
     await connectToDatabase();
 
-    // Update server transaction to CONFIRMED
     const txn = await Transaction.findOneAndUpdate(
       { transactionId },
       {

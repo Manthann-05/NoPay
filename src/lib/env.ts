@@ -20,6 +20,8 @@ export function getEnv(): EnvConfig {
 
   const MONGODB_URI = process.env.MONGODB_URI;
   const AUTH_SECRET = process.env.AUTH_SECRET;
+  const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
+  const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 
   const errors: string[] = [];
 
@@ -33,11 +35,18 @@ export function getEnv(): EnvConfig {
     errors.push('AUTH_SECRET must be at least 32 characters long.');
   }
 
+  const hasRazorpayKeyId = Boolean(RAZORPAY_KEY_ID && RAZORPAY_KEY_ID.trim());
+  const hasRazorpaySecret = Boolean(RAZORPAY_KEY_SECRET && RAZORPAY_KEY_SECRET.trim());
+
+  if (hasRazorpayKeyId !== hasRazorpaySecret) {
+    errors.push('RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be configured together for online payment processing.');
+  }
+
   if (errors.length > 0) {
     const errorMsg =
       `[NoPay Environment Config Error]\n` +
       errors.map((e) => `  - ${e}`).join('\n') +
-      `\nSet these in .env.local. The application cannot start without them.`;
+      `\nSet these in .env.local. The application cannot start without required secrets.`;
     console.error(errorMsg);
     throw new Error(errorMsg);
   }
@@ -45,8 +54,8 @@ export function getEnv(): EnvConfig {
   validatedEnv = {
     MONGODB_URI: MONGODB_URI as string,
     AUTH_SECRET: AUTH_SECRET as string,
-    RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID,
-    RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET,
+    RAZORPAY_KEY_ID: RAZORPAY_KEY_ID || undefined,
+    RAZORPAY_KEY_SECRET: RAZORPAY_KEY_SECRET || undefined,
   };
 
   return validatedEnv;
