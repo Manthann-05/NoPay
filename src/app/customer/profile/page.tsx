@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { RoleSwitcher } from '@/components/shared/RoleSwitcher';
 import { User, UserRole } from '@/types';
+import { clearLocalSession } from '@/offline/session';
+import { notifyAuthStateChanged } from '@/lib/auth/client';
 import { User as UserIcon, Store, ArrowLeft, LogOut, ShieldCheck, Mail } from 'lucide-react';
 
 // Force dynamic rendering to avoid pre-rendering issues with client-side hooks
@@ -28,7 +30,9 @@ export default function CustomerProfilePage() {
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/login');
+    await clearLocalSession();
+    notifyAuthStateChanged();
+    router.replace('/login');
   };
 
   if (loading) {

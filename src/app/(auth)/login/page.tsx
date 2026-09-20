@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { QrCode, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 import { getLocalSession } from '@/offline/session';
+import { notifyAuthStateChanged } from '@/lib/auth/client';
 
 // Force dynamic rendering to avoid pre-rendering issues with client-side hooks
 export const dynamic = 'force-dynamic';
@@ -15,6 +16,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,7 +26,7 @@ export default function LoginPage() {
         const response = await fetch('/api/auth/me', { cache: 'no-store' });
         if (response.ok) {
           const data = await response.json();
-          if (!cancelled && data.authenticated && data.user) {
+          if (!cancelled && !isSubmittingRef.current && data.authenticated && data.user) {
             router.replace(data.user.activeRole === 'MERCHANT'
               ? '/merchant/dashboard'
               : '/customer/dashboard');
@@ -35,8 +37,10 @@ export default function LoginPage() {
         // Fall back to the offline session below.
       }
 
+      if (cancelled || isSubmittingRef.current) return;
+
       const session = await getLocalSession();
-      if (!cancelled && session?.userId) {
+      if (!cancelled && !isSubmittingRef.current && session?.userId) {
         router.replace(session.activeRole === 'MERCHANT' && session.roles.includes('MERCHANT')
           ? '/merchant/dashboard'
           : '/customer/dashboard');
@@ -51,6 +55,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    isSubmittingRef.current = true;
     setError(null);
     setLoading(true);
 
@@ -80,6 +85,7 @@ export default function LoginPage() {
         user.merchantProfile?.shopName
       );
 
+      notifyAuthStateChanged();
       router.replace(user.activeRole === 'MERCHANT' ? '/merchant/dashboard' : '/customer/dashboard');
     } catch (err) {
       setError('An error occurred during authentication');

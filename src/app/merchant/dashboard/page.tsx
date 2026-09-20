@@ -96,9 +96,9 @@ export default function MerchantDashboardPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-8">
+    <div className="w-full py-6 space-y-7">
       {/* Welcome Banner */}
-      <div className="bg-navy-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6 border border-slate-800">
+      <div className="bg-navy-900 rounded-3xl p-6 lg:p-7 text-white shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-5 border border-slate-800">
         <div className="space-y-2">
           <span className="text-[10px] font-extrabold uppercase tracking-widest text-brand-lightBlue px-3 py-1 bg-white/10 rounded-full">
             Merchant POS Workspace
@@ -109,7 +109,7 @@ export default function MerchantDashboardPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-3 shrink-0">
           <Link
             href="/merchant/billing"
             className="px-6 py-3.5 bg-brand-blue hover:bg-blue-600 text-white font-black rounded-xl text-sm shadow-md hover:shadow-lg transition-all flex items-center gap-2"
@@ -128,8 +128,8 @@ export default function MerchantDashboardPage() {
       </div>
 
       {/* Metrics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="bg-white p-5 lg:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
           <div className="flex justify-between items-center text-slate-400">
             <span className="text-xs font-extrabold uppercase tracking-wider">Total Sales</span>
             <TrendingUp className="w-5 h-5 text-emerald-500" />
@@ -138,7 +138,7 @@ export default function MerchantDashboardPage() {
           <p className="text-[11px] text-slate-500 font-medium">Combined online & offline revenue</p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+        <div className="bg-white p-5 lg:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
           <div className="flex justify-between items-center text-slate-400">
             <span className="text-xs font-extrabold uppercase tracking-wider">Total Transactions</span>
             <FileText className="w-5 h-5 text-brand-blue" />
@@ -147,7 +147,7 @@ export default function MerchantDashboardPage() {
           <p className="text-[11px] text-slate-500 font-medium">Processed order count</p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+        <div className="bg-white p-5 lg:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
           <div className="flex justify-between items-center text-slate-400">
             <span className="text-xs font-extrabold uppercase tracking-wider">Offline Queued</span>
             <Clock className="w-5 h-5 text-amber-500" />
@@ -163,7 +163,7 @@ export default function MerchantDashboardPage() {
           <p className="text-[11px] text-slate-500 font-medium">Awaiting auto server sync</p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+        <div className="bg-white p-5 lg:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
           <div className="flex justify-between items-center text-slate-400">
             <span className="text-xs font-extrabold uppercase tracking-wider">Products</span>
             <Package className="w-5 h-5 text-purple-500" />
@@ -174,10 +174,10 @@ export default function MerchantDashboardPage() {
       </div>
 
       {/* Quick Action Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <Link
           href="/merchant/billing"
-          className="bg-blue-50/70 border border-blue-100 p-5 rounded-2xl hover:border-brand-blue hover:shadow-md transition-all group space-y-2"
+          className="bg-blue-50/70 border border-blue-100 p-5 rounded-2xl hover:border-brand-blue hover:shadow-md transition-all group space-y-2 min-w-0"
         >
           <div className="w-10 h-10 bg-brand-blue text-white rounded-xl flex items-center justify-center font-bold">
             <CreditCard className="w-5 h-5" />
@@ -190,7 +190,7 @@ export default function MerchantDashboardPage() {
 
         <Link
           href="/merchant/products"
-          className="bg-slate-50 border border-slate-200 p-5 rounded-2xl hover:border-slate-300 hover:shadow-md transition-all group space-y-2"
+          className="bg-slate-50 border border-slate-200 p-5 rounded-2xl hover:border-slate-300 hover:shadow-md transition-all group space-y-2 min-w-0"
         >
           <div className="w-10 h-10 bg-purple-600 text-white rounded-xl flex items-center justify-center font-bold">
             <Package className="w-5 h-5" />
@@ -203,7 +203,7 @@ export default function MerchantDashboardPage() {
 
         <Link
           href="/merchant/sync"
-          className="bg-amber-50/70 border border-amber-200 p-5 rounded-2xl hover:border-amber-400 hover:shadow-md transition-all group space-y-2"
+          className="bg-amber-50/70 border border-amber-200 p-5 rounded-2xl hover:border-amber-400 hover:shadow-md transition-all group space-y-2 min-w-0"
         >
           <div className="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center font-bold">
             <Zap className="w-5 h-5" />
@@ -216,7 +216,7 @@ export default function MerchantDashboardPage() {
 
         <Link
           href="/merchant/reports"
-          className="bg-emerald-50/70 border border-emerald-200 p-5 rounded-2xl hover:border-emerald-400 hover:shadow-md transition-all group space-y-2"
+          className="bg-emerald-50/70 border border-emerald-200 p-5 rounded-2xl hover:border-emerald-400 hover:shadow-md transition-all group space-y-2 min-w-0"
         >
           <div className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center font-bold">
             <BarChart3 className="w-5 h-5" />

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserRole } from '@/types';
+import { notifyAuthStateChanged } from '@/lib/auth/client';
 import { Store, Smartphone, ArrowRightLeft, PlusCircle } from 'lucide-react';
 
 interface RoleSwitcherProps {
@@ -10,9 +11,10 @@ interface RoleSwitcherProps {
   roles: UserRole[];
   hasMerchantProfile?: boolean;
   onRoleChanged?: (newRole: UserRole) => void;
+  compact?: boolean;
 }
 
-export function RoleSwitcher({ currentRole, roles, hasMerchantProfile, onRoleChanged }: RoleSwitcherProps) {
+export function RoleSwitcher({ currentRole, roles, hasMerchantProfile, onRoleChanged, compact = false }: RoleSwitcherProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -50,6 +52,7 @@ export function RoleSwitcher({ currentRole, roles, hasMerchantProfile, onRoleCha
       }
 
       if (onRoleChanged) onRoleChanged(targetRole);
+      notifyAuthStateChanged();
       if (targetRole === 'MERCHANT') {
         router.push('/merchant/dashboard');
       } else {
@@ -64,11 +67,15 @@ export function RoleSwitcher({ currentRole, roles, hasMerchantProfile, onRoleCha
   };
 
   return (
-    <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
+    <div className={`flex items-center bg-slate-100 rounded-xl border border-slate-200 shadow-inner ${
+      compact ? 'p-0.5' : 'p-1'
+    }`}>
       <button
         onClick={() => switchRole('CUSTOMER')}
         disabled={loading}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+        className={`flex items-center rounded-lg font-semibold transition-all ${
+          compact ? 'gap-1 px-2 py-1 text-[11px]' : 'gap-1.5 px-3 py-1.5 text-xs'
+        } ${
           currentRole === 'CUSTOMER'
             ? 'bg-white text-blue-700 shadow-sm border border-slate-200'
             : 'text-slate-600 hover:text-slate-900'
@@ -81,7 +88,9 @@ export function RoleSwitcher({ currentRole, roles, hasMerchantProfile, onRoleCha
       <button
         onClick={() => switchRole('MERCHANT')}
         disabled={loading}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+        className={`flex items-center rounded-lg font-semibold transition-all ${
+          compact ? 'gap-1 px-2 py-1 text-[11px]' : 'gap-1.5 px-3 py-1.5 text-xs'
+        } ${
           currentRole === 'MERCHANT'
             ? 'bg-navy-900 text-white shadow-sm'
             : 'text-slate-600 hover:text-slate-900'

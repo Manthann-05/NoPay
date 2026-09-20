@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { QrCode, Lock, Mail, User, Store, ArrowRight, AlertCircle, MapPin } from 'lucide-react';
 import { getLocalSession } from '@/offline/session';
+import { notifyAuthStateChanged } from '@/lib/auth/client';
 
 // Force dynamic rendering to avoid pre-rendering issues with client-side hooks
 export const dynamic = 'force-dynamic';
@@ -104,6 +105,7 @@ export default function RegisterPage() {
         console.warn('Could not save offline session during registration', err);
       }
 
+      notifyAuthStateChanged();
       router.replace(initialRole === 'MERCHANT' ? '/merchant/dashboard' : '/customer/dashboard');
     } catch (err) {
       setError('An error occurred during registration');

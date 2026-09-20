@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { RoleSwitcher } from '@/components/shared/RoleSwitcher';
 import { User } from '@/types';
+import { clearLocalSession } from '@/offline/session';
+import { notifyAuthStateChanged } from '@/lib/auth/client';
 import { Store, Building2, MapPin, ShieldCheck, LogOut, ArrowLeft } from 'lucide-react';
 
 export default function MerchantProfilePage() {
@@ -25,7 +27,9 @@ export default function MerchantProfilePage() {
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/login');
+    await clearLocalSession();
+    notifyAuthStateChanged();
+    router.replace('/login');
   };
 
   if (loading) {

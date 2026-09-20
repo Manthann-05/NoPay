@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { OfflineBadge } from './OfflineBadge';
@@ -8,6 +8,7 @@ import { RoleSwitcher } from './RoleSwitcher';
 import { UserRole } from '@/types';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { getLocalSession, clearLocalSession } from '@/offline/session';
+import { AUTH_STATE_CHANGED_EVENT, notifyAuthStateChanged } from '@/lib/auth/client';
 import {
   QrCode,
   LayoutDashboard,
@@ -19,9 +20,6 @@ import {
   LogOut,
   User as UserIcon,
   Store,
-  Menu,
-  X,
-  HelpCircle,
 } from 'lucide-react';
 
 interface NavbarUser {
@@ -39,17 +37,19 @@ export function Navbar() {
   const router = useRouter();
   const { isOnline } = useOnlineStatus();
   
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user, setUser] = useState<NavbarUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
+
     async function loadUser() {
-      setIsLoading(true);
       try {
         if (isOnline) {
-          // Fetch from API
-          const res = await fetch('/api/auth/me');
+          const res = await fetch('/api/auth/me', {
+            cache: 'no-store',
+            signal: controller.signal,
+          });
           if (res.ok) {
             const data = await res.json();
             if (data.authenticated) {
@@ -73,10 +73,10 @@ export function Navbar() {
           setUser(null);
         }
       } catch (err) {
+        if (controller.signal.aborted) return;
         console.error('Failed to load user', err);
-        // Desperate fallback to local session
         const session = await getLocalSession();
-        if (session) {
+        if (session && !controller.signal.aborted) {
           setUser({
             name: session.name,
             email: session.email,
@@ -86,11 +86,18 @@ export function Navbar() {
           });
         }
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     }
 
     loadUser();
+    window.addEventListener(AUTH_STATE_CHANGED_EVENT, loadUser);
+    return () => {
+      controller.abort();
+      window.removeEventListener(AUTH_STATE_CHANGED_EVENT, loadUser);
+    };
   }, [isOnline]);
 
   const activeRole = user?.activeRole || 'CUSTOMER';
@@ -103,8 +110,8 @@ export function Navbar() {
       }
       await clearLocalSession();
       setUser(null);
+      notifyAuthStateChanged();
       router.push('/login');
-      router.refresh();
     } catch (err) {
       console.error('Logout error:', err);
     }
@@ -134,7 +141,9 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo & Shop Name */}
-          <div className="flex items-center gap-3">
+          <div className={`flex items-center ${
+            activeRole === 'MERCHANT' ? 'gap-1.5' : 'gap-3'
+          }`}>
             <Link href="/" className="flex items-center gap-2.5 group">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-navy-900 to-brand-blue flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
                 <QrCode className="w-6 h-6" />
@@ -161,15 +170,21 @@ export function Navbar() {
           </div>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-1">
-            {currentNavItems.map((item) => {
+          <nav className={`flex min-w-0 flex-1 items-center justify-center ${
+            activeRole === 'MERCHANT' ? 'gap-0 px-0' : 'gap-0.5 px-2'
+          }`}>
+            {user && currentNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href || Boolean(pathname?.startsWith(item.href + '/'));
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex shrink-0 items-center rounded-lg py-2 font-medium transition-colors ${
+                    activeRole === 'MERCHANT'
+                      ? 'gap-0.5 px-1 text-[11px]'
+                      : 'gap-1.5 px-2.5 text-sm'
+                  } ${
                     isActive
                       ? 'bg-blue-50 text-brand-blue font-semibold'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -190,10 +205,19 @@ export function Navbar() {
               user ? (
                 <>
                   <div className="hidden md:block">
-                    <RoleSwitcher currentRole={activeRole} roles={roles} />
+                    <RoleSwitcher
+                      currentRole={activeRole}
+                      roles={roles}
+                      compact={activeRole === 'MERCHANT'}
+                      onRoleChanged={(newRole) => setUser((current) => (
+                        current ? { ...current, activeRole: newRole } : current
+                      ))}
+                    />
                   </div>
 
-                  <div className="relative flex items-center gap-2 pl-2 border-l border-slate-200">
+                  <div className={`relative flex items-center border-l border-slate-200 ${
+                    activeRole === 'MERCHANT' ? 'gap-1 pl-1.5' : 'gap-2 pl-2'
+                  }`}>
                     <div className="hidden sm:flex flex-col text-right">
                       <span className="text-xs font-bold text-slate-800 leading-tight">
                         {user.name}
@@ -204,7 +228,9 @@ export function Navbar() {
                     <button
                       onClick={handleLogout}
                       title="Logout"
-                      className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                      className={`text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors ${
+                        activeRole === 'MERCHANT' ? 'p-1.5' : 'p-2'
+                      }`}
                     >
                       <LogOut className="w-4 h-4" />
                     </button>
@@ -228,53 +254,9 @@ export function Navbar() {
               )
             )}
 
-            {/* Mobile Hamburger Menu */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-2 text-slate-600 hover:text-slate-900 rounded-lg"
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
           </div>
         </div>
       </div>
-
-      {/* Mobile Drawer Navigation */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden border-t border-slate-200 bg-white px-4 pt-3 pb-6 space-y-3 shadow-lg">
-          {user && (
-            <div className="mb-3 p-3 bg-slate-50 rounded-xl flex items-center justify-between border border-slate-200">
-              <div>
-                <div className="text-sm font-bold text-slate-900">{user.name}</div>
-                <div className="text-xs text-slate-500">{user.email}</div>
-              </div>
-              <RoleSwitcher currentRole={activeRole} roles={roles} />
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-2">
-            {currentNavItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-2.5 p-3 rounded-xl text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-brand-blue text-white font-semibold shadow-sm'
-                      : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </header>
   );
 }
