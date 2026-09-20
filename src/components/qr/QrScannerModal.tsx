@@ -68,6 +68,7 @@ export function QrScannerModal({ onScanSuccess, onClose }: QrScannerModalProps) 
     setCameraError(null);
     hasScannedRef.current = false;
 
+    await stopCamera();
     await new Promise((r) => setTimeout(r, 150));
     if (!isMountedRef.current) return;
 
@@ -78,44 +79,74 @@ export function QrScannerModal({ onScanSuccess, onClose }: QrScannerModalProps) 
       return;
     }
 
-    try {
-      const html5QrCode = new Html5Qrcode(READER_ELEMENT_ID, {
-        verbose: false,
-        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-      });
-      scannerRef.current = html5QrCode;
+    const html5QrCode = new Html5Qrcode(READER_ELEMENT_ID, {
+      verbose: false,
+      formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+    });
+    scannerRef.current = html5QrCode;
 
+    const scannerConfig = {
+      fps: 12,
+      qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+        const minEdge = Math.min(viewfinderWidth, viewfinderHeight, window.innerWidth);
+        const size = Math.max(140, Math.min(Math.floor(minEdge * 0.72), 280));
+        return { width: size, height: size };
+      },
+      aspectRatio: 1.0,
+    };
+    const onDecoded = (decodedText: string) => {
+      if (hasScannedRef.current) return;
+
+      const result = parseScannedQr(decodedText);
+      if (result) {
+        hasScannedRef.current = true;
+        setScanStatus(result.type === 'EXTERNAL' ? 'Payment QR detected' : 'NoPay QR detected');
+        stopCamera().then(() => {
+          if (isMountedRef.current) {
+            onScanSuccessRef.current(result, decodedText);
+          }
+        });
+      } else {
+        setScanStatus('QR not recognized — point at a valid payment QR');
+      }
+    };
+    const onFrameError = () => {
+      // Frames without a QR code are expected while scanning.
+    };
+
+    try {
+      try {
         await html5QrCode.start(
           { facingMode: 'environment' },
-          {
-            fps: 12,
-            qrbox: (viewfinderWidth, viewfinderHeight) => {
-              const minEdge = Math.min(viewfinderWidth, viewfinderHeight, window.innerWidth);
-              const size = Math.max(140, Math.min(Math.floor(minEdge * 0.72), 280));
-              return { width: size, height: size };
-            },
-            aspectRatio: 1.0,
-          },
-        (decodedText) => {
-          if (hasScannedRef.current) return;
+          scannerConfig,
+          onDecoded,
+          onFrameError
+        );
+      } catch (firstError) {
+        await stopCamera();
+        if (!isMountedRef.current) return;
 
-          const result = parseScannedQr(decodedText);
-          if (result) {
-            hasScannedRef.current = true;
-            setScanStatus(result.type === 'EXTERNAL' ? 'Payment QR detected' : 'NoPay QR detected');
-            stopCamera().then(() => {
-              if (isMountedRef.current) {
-                onScanSuccessRef.current(result, decodedText);
-              }
-            });
-          } else {
-            setScanStatus('QR not recognized — point at a valid payment QR');
-          }
-        },
-        () => {
-          // frame decode failure
+        const cameras = await Html5Qrcode.getCameras();
+        const fallbackCamera = cameras.find((camera) =>
+          /back|rear|environment/i.test(camera.label)
+        ) || cameras[0];
+
+        if (!fallbackCamera) {
+          throw firstError;
         }
-      );
+
+        const fallbackScanner = new Html5Qrcode(READER_ELEMENT_ID, {
+          verbose: false,
+          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        });
+        scannerRef.current = fallbackScanner;
+        await fallbackScanner.start(
+          fallbackCamera.id,
+          scannerConfig,
+          onDecoded,
+          onFrameError
+        );
+      }
 
       if (isMountedRef.current) {
         setIsStarting(false);
@@ -124,6 +155,7 @@ export function QrScannerModal({ onScanSuccess, onClose }: QrScannerModalProps) 
     } catch (err: unknown) {
       if (!isMountedRef.current) return;
       setIsStarting(false);
+      await stopCamera();
 
       const msg = String(err instanceof Error ? err.message : err || '');
       if (
@@ -248,7 +280,16 @@ export function QrScannerModal({ onScanSuccess, onClose }: QrScannerModalProps) 
             {cameraError && (
               <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-start gap-2 w-full">
                 <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <p className="font-medium">{cameraError}</p>
+                <div className="flex-1 space-y-2 text-left">
+                  <p className="font-medium">{cameraError}</p>
+                  <button
+                    type="button"
+                    onClick={() => void startCamera()}
+                    className="font-bold text-brand-blue hover:text-brand-darkBlue"
+                  >
+                    Try camera again
+                  </button>
+                </div>
               </div>
             )}
           </div>
