@@ -32,6 +32,13 @@ interface NavbarUser {
   } | null;
 }
 
+const CUSTOMER_ROUTE_PATHS = [
+  '/customer/dashboard',
+  '/customer/scan',
+  '/customer/transactions',
+  '/customer/profile',
+];
+
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -99,6 +106,19 @@ export function Navbar() {
       window.removeEventListener(AUTH_STATE_CHANGED_EVENT, loadUser);
     };
   }, [isOnline]);
+
+  useEffect(() => {
+    if (!isOnline || !user || typeof navigator === 'undefined' || !navigator.serviceWorker) {
+      return;
+    }
+
+    navigator.serviceWorker.ready.then((registration) => {
+      registration.active?.postMessage({
+        type: 'CACHE_ROUTES',
+        routes: CUSTOMER_ROUTE_PATHS,
+      });
+    });
+  }, [isOnline, user?.email]);
 
   const activeRole = user?.activeRole || 'CUSTOMER';
   const roles = user?.roles || ['CUSTOMER'];
@@ -180,6 +200,12 @@ export function Navbar() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={(event) => {
+                    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+                      event.preventDefault();
+                      window.location.assign(item.href);
+                    }
+                  }}
                   className={`flex shrink-0 items-center rounded-lg py-2 font-medium transition-colors ${
                     activeRole === 'MERCHANT'
                       ? 'gap-0.5 px-1 text-[11px]'

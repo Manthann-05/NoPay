@@ -44,6 +44,32 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+self.addEventListener('message', (event) => {
+  if (event.data?.type !== 'CACHE_ROUTES' || !Array.isArray(event.data.routes)) {
+    return;
+  }
+
+  event.waitUntil(
+    caches.open(DYNAMIC_CACHE).then(async (cache) => {
+      await Promise.all(
+        event.data.routes.map(async (route) => {
+          try {
+            const request = new Request(new URL(route, self.location.origin).toString(), {
+              credentials: 'include',
+            });
+            const response = await fetch(request);
+            if (response.ok) {
+              await cache.put(request, response);
+            }
+          } catch {
+            // Route caching is best effort; online navigation remains available.
+          }
+        })
+      );
+    })
+  );
+});
+
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 

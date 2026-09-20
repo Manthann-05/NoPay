@@ -133,7 +133,9 @@ export function parseNoPayQr(raw: string): NoPayQrResult | null {
   try {
     if (!raw || typeof raw !== 'string') return null;
 
-    const trimmed = raw.trim();
+    const trimmed = raw
+      .replace(/[\u0000-\u001f\u007f\u200b-\u200d\ufeff]/g, '')
+      .trim();
 
     // Must start with NOPAY:// (case-insensitive)
     if (!trimmed.toUpperCase().startsWith(NOPAY_SCHEME)) return null;
