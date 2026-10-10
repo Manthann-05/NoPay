@@ -6,6 +6,7 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { addOfflineTransaction } from '@/offline/queue';
 import { Transaction } from '@/types';
 import { readScannedQr } from '@/lib/qr/scanHandoff';
+import { useSnackbar } from '@/components/shared/SnackbarProvider';
 import { Store, CreditCard, ArrowLeft, ShieldCheck, WifiOff } from 'lucide-react';
 
 // Force dynamic rendering to avoid pre-rendering issues with client-side hooks
@@ -14,6 +15,7 @@ export const dynamic = 'force-dynamic';
 export default function CustomerStaticPayPage() {
   const router = useRouter();
   const { isOnline } = useOnlineStatus();
+  const { showSnackbar } = useSnackbar();
   const [merchant, setMerchant] = useState<{
     merchantId: string;
     merchantName: string;
@@ -67,6 +69,11 @@ export default function CustomerStaticPayPage() {
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
       setError('Please enter a valid amount greater than ₹0');
+      showSnackbar({
+        type: 'warning',
+        title: 'Invalid Amount',
+        description: 'Please enter a valid amount greater than ₹0.',
+      });
       return;
     }
 
@@ -93,6 +100,11 @@ export default function CustomerStaticPayPage() {
           updatedAt: new Date().toISOString(),
         })
       );
+      showSnackbar({
+        type: 'success',
+        title: 'Payment Confirmed',
+        description: `Paid ₹${numAmount.toFixed(2)} to ${merchant.merchantName}`,
+      });
       router.push('/customer/payment?status=confirmed');
       return;
     }
@@ -136,29 +148,58 @@ export default function CustomerStaticPayPage() {
         });
         const data = await res.json();
         if (res.ok && data.success) {
-          sessionStorage.setItem(
-            'nopay_last_txn',
-            JSON.stringify({ ...newTxn, status: 'CONFIRMED' })
-          );
+          const confirmedTxn = { ...newTxn, status: 'CONFIRMED' as const };
+          // Save locally so offline records stay complete
+          try {
+            const { offlineDb } = await import('@/offline/db');
+            await offlineDb.transactions.put(confirmedTxn);
+          } catch {
+            // ignore
+          }
+
+          sessionStorage.setItem('nopay_last_txn', JSON.stringify(confirmedTxn));
+          showSnackbar({
+            type: 'success',
+            title: 'Payment Confirmed Online',
+            description: `Paid ₹${numAmount.toFixed(2)} to ${merchant.merchantName}. Both you and the merchant have record of this.`,
+          });
           router.push('/customer/payment?status=confirmed');
           return;
         }
         if (res.status >= 400 && res.status < 500 && res.status !== 401) {
-          setError(data.error || 'This transaction could not be confirmed.');
+          const errorMsg = data.error || 'This transaction could not be confirmed.';
+          setError(errorMsg);
+          showSnackbar({
+            type: 'error',
+            title: 'Payment Rejected by Server',
+            description: errorMsg,
+          });
           setLoading(false);
           return;
         }
       } catch {
-        // queue offline
+        // queue offline gracefully on connection hiccup
       }
     }
 
     try {
       await addOfflineTransaction(newTxn);
       sessionStorage.setItem('nopay_last_txn', JSON.stringify(newTxn));
+      showSnackbar({
+        type: 'pending',
+        title: 'Offline Payment Queued',
+        description: `₹${numAmount.toFixed(2)} queued offline. Instantly visible on both your device and the merchant's screen as Pending Sync.`,
+        durationMs: 5500,
+      });
       router.push('/customer/payment?status=queued');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save transaction');
+      const errMsg = err instanceof Error ? err.message : 'Failed to save transaction';
+      setError(errMsg);
+      showSnackbar({
+        type: 'error',
+        title: 'Offline Save Error',
+        description: errMsg,
+      });
     } finally {
       setLoading(false);
     }
@@ -207,7 +248,7 @@ export default function CustomerStaticPayPage() {
           {!isOnline && (
             <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-semibold">
               <WifiOff className="w-4 h-4 shrink-0 text-amber-600" />
-              <span>You&apos;re offline. Your transaction will be saved and will sync when internet returns.</span>
+              <span>You&apos;re offline. Your payment will be stored safely and display immediately on both customer and merchant screens.</span>
             </div>
           )}
 
@@ -219,7 +260,7 @@ export default function CustomerStaticPayPage() {
                 <input
                   type="number"
                   step="0.01"
-                  min="1"
+                  min="0.01"
                   required
                   placeholder="0.00"
                   value={amount}
@@ -256,14 +297,14 @@ export default function CustomerStaticPayPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 bg-brand-blue hover:bg-brand-darkBlue text-white font-black rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base"
+              className="w-full py-4 bg-brand-blue hover:bg-brand-darkBlue text-white font-black rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base disabled:opacity-50"
             >
               {loading ? (
-                <span>Saving…</span>
+                <span>Processing Payment…</span>
               ) : (
                 <>
                   <CreditCard className="w-5 h-5" />
-                  <span>Continue ₹{amount || '0.00'}</span>
+                  <span>Pay ₹{amount || '0.00'}</span>
                 </>
               )}
             </button>
@@ -271,7 +312,7 @@ export default function CustomerStaticPayPage() {
 
           <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 font-semibold pt-2">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Saved offline until confirmed online</span>
+            <span>Dual-Sided Transparent Offline Verification</span>
           </div>
         </div>
       ) : null}

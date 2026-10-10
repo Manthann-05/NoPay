@@ -7,6 +7,7 @@ import { addOfflineTransaction } from '@/offline/queue';
 import { BillQrPayload, Transaction } from '@/types';
 import { readScannedQr } from '@/lib/qr/scanHandoff';
 import { isBillExpired } from '@/lib/status/labels';
+import { useSnackbar } from '@/components/shared/SnackbarProvider';
 import { CreditCard, ArrowLeft, ShieldCheck, WifiOff } from 'lucide-react';
 
 // Force dynamic rendering to avoid pre-rendering issues with client-side hooks
@@ -17,6 +18,7 @@ export default function CustomerBillDetailPage() {
   const params = useParams();
   const billIdParam = params?.id as string;
   const { isOnline } = useOnlineStatus();
+  const { showSnackbar } = useSnackbar();
 
   const [bill, setBill] = useState<BillQrPayload | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -91,6 +93,11 @@ export default function CustomerBillDetailPage() {
     if (!bill) return;
     if (isBillExpired(bill.expiresAt)) {
       setError('Bill Expired');
+      showSnackbar({
+        type: 'error',
+        title: 'Bill Has Expired',
+        description: 'Please ask the merchant for a new QR bill.',
+      });
       return;
     }
 
@@ -141,29 +148,57 @@ export default function CustomerBillDetailPage() {
         });
         const data = await res.json();
         if (res.ok && data.success) {
-          sessionStorage.setItem(
-            'nopay_last_txn',
-            JSON.stringify({ ...newTxn, status: 'CONFIRMED' })
-          );
+          const confirmedTxn = { ...newTxn, status: 'CONFIRMED' as const };
+          try {
+            const { offlineDb } = await import('@/offline/db');
+            await offlineDb.transactions.put(confirmedTxn);
+          } catch {
+            // ignore
+          }
+
+          sessionStorage.setItem('nopay_last_txn', JSON.stringify(confirmedTxn));
+          showSnackbar({
+            type: 'success',
+            title: 'Bill Paid & Confirmed',
+            description: `Payment of ₹${bill.total.toFixed(2)} confirmed online for Bill ${bill.billId}.`,
+          });
           router.push('/customer/payment?status=confirmed');
           return;
         }
         if (res.status >= 400 && res.status < 500 && res.status !== 401) {
-          setError(data.error || 'This bill could not be confirmed.');
+          const errMsg = data.error || 'This bill could not be confirmed.';
+          setError(errMsg);
+          showSnackbar({
+            type: 'error',
+            title: 'Bill Confirmation Failed',
+            description: errMsg,
+          });
           setPaying(false);
           return;
         }
       } catch {
-        // queue offline
+        // queue offline safely on connection failure
       }
     }
 
     try {
       await addOfflineTransaction(newTxn);
       sessionStorage.setItem('nopay_last_txn', JSON.stringify(newTxn));
+      showSnackbar({
+        type: 'pending',
+        title: 'Offline Bill Payment Queued',
+        description: `₹${bill.total.toFixed(2)} queued offline. Instantly showing as Pending Sync on both customer and merchant displays.`,
+        durationMs: 5500,
+      });
       router.push('/customer/payment?status=queued');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save transaction');
+      const errMsg = err instanceof Error ? err.message : 'Failed to save transaction';
+      setError(errMsg);
+      showSnackbar({
+        type: 'error',
+        title: 'Offline Save Error',
+        description: errMsg,
+      });
     } finally {
       setPaying(false);
     }
@@ -209,87 +244,90 @@ export default function CustomerBillDetailPage() {
                 {bill.billId}
               </span>
             </div>
-            <h2 className="text-2xl font-black text-white">{bill.merchantName}</h2>
-            <p className="text-xs text-slate-300">
-              Generated {new Date(bill.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </p>
+
+            <div>
+              <span className="text-xs text-slate-400">Merchant</span>
+              <h2 className="text-xl font-black">{bill.merchantName}</h2>
+            </div>
           </div>
 
-          {error && (
-            <div className="p-3 bg-rose-50 border-b border-rose-200 text-rose-700 text-xs font-semibold">
-              {error}
-            </div>
-          )}
-
-          {!isOnline && (
-            <div className="p-3 bg-amber-50 border-b border-amber-200 flex items-center gap-2 text-amber-800 text-xs font-semibold">
-              <WifiOff className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>You&apos;re offline. Your transaction has been saved locally and will sync when internet returns.</span>
-            </div>
-          )}
-
-          <div className="p-6 space-y-6">
-            <div className="border border-slate-100 rounded-2xl overflow-hidden divide-y divide-slate-100">
-              <div className="bg-slate-50 px-4 py-2.5 flex justify-between text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
-                <span>Item & Qty</span>
-                <span>Amount</span>
+          <div className="p-6 space-y-5">
+            {error && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold">
+                {error}
               </div>
-              {bill.items.map((item, idx) => (
-                <div key={idx} className="px-4 py-3 flex items-center justify-between text-xs">
-                  <div>
-                    <p className="font-bold text-navy-900">{item.name}</p>
-                    <p className="text-[11px] text-slate-400 font-medium">
-                      {item.quantity} × ₹{item.price.toFixed(2)}
-                    </p>
+            )}
+
+            {!isOnline && (
+              <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-semibold">
+                <WifiOff className="w-4 h-4 shrink-0 text-amber-600" />
+                <span>You&apos;re offline. The bill total is verified from the QR code and will be visible on both sides immediately.</span>
+              </div>
+            )}
+
+            {/* Itemized Table */}
+            <div>
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2">
+                Order Summary ({bill.items.length} items)
+              </h3>
+              <div className="divide-y divide-slate-100 border border-slate-100 rounded-2xl overflow-hidden">
+                {bill.items.map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-center p-3 text-xs">
+                    <div>
+                      <span className="font-bold text-navy-900">{item.name}</span>
+                      <span className="text-slate-400 ml-1.5 font-medium">x{item.quantity}</span>
+                    </div>
+                    <span className="font-mono font-bold text-navy-900">
+                      ₹{(item.price * item.quantity).toFixed(2)}
+                    </span>
                   </div>
-                  <span className="font-extrabold text-navy-900">
-                    ₹{(item.quantity * item.price).toFixed(2)}
-                  </span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
 
-            <div className="bg-blue-50/60 p-4 rounded-2xl border border-blue-100 space-y-2">
-              <div className="flex justify-between items-center text-xs text-slate-600 font-semibold">
-                <span>Subtotal ({bill.items.length} items)</span>
-                <span>₹{(bill.subtotal ?? bill.total).toFixed(2)}</span>
+            {/* Calculations Breakdown */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2 text-xs">
+              <div className="flex justify-between text-slate-500">
+                <span>Subtotal</span>
+                <span className="font-mono">₹{(bill.subtotal ?? bill.total).toFixed(2)}</span>
               </div>
-              {!!bill.discount && (
-                <div className="flex justify-between items-center text-xs text-slate-600 font-semibold">
+              {bill.discount ? (
+                <div className="flex justify-between text-emerald-600">
                   <span>Discount</span>
-                  <span>-₹{bill.discount.toFixed(2)}</span>
+                  <span className="font-mono">-₹{bill.discount.toFixed(2)}</span>
                 </div>
-              )}
-              {!!bill.tax && (
-                <div className="flex justify-between items-center text-xs text-slate-600 font-semibold">
-                  <span>Tax</span>
-                  <span>₹{bill.tax.toFixed(2)}</span>
+              ) : null}
+              {bill.tax ? (
+                <div className="flex justify-between text-slate-500">
+                  <span>Tax / GST</span>
+                  <span className="font-mono">+₹{bill.tax.toFixed(2)}</span>
                 </div>
-              )}
-              <div className="flex justify-between items-center text-sm font-black text-navy-900 pt-2 border-t border-blue-200/60">
-                <span>Total Amount Due</span>
-                <span className="text-2xl text-brand-blue">₹{bill.total.toFixed(2)}</span>
+              ) : null}
+              <div className="flex justify-between items-center text-sm font-black text-navy-900 pt-2 border-t border-slate-200">
+                <span>Total Amount</span>
+                <span className="text-xl text-brand-blue">₹{bill.total.toFixed(2)}</span>
               </div>
             </div>
 
+            {/* Pay Button */}
             <button
               onClick={handlePayBill}
               disabled={paying}
-              className="w-full py-4 bg-brand-blue hover:bg-brand-darkBlue text-white font-black rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base"
+              className="w-full py-4 bg-brand-blue hover:bg-brand-darkBlue text-white font-black rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base disabled:opacity-50"
             >
               {paying ? (
-                <span>Saving…</span>
+                <span>Confirming Bill Payment…</span>
               ) : (
                 <>
                   <CreditCard className="w-5 h-5" />
-                  <span>Confirm ₹{bill.total.toFixed(2)}</span>
+                  <span>Pay Bill ₹{bill.total.toFixed(2)}</span>
                 </>
               )}
             </button>
 
-            <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 font-semibold">
+            <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 font-semibold pt-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Saved Offline — will sync when internet returns</span>
+              <span>NoPay Idempotent Dual-Side Transaction Queue</span>
             </div>
           </div>
         </div>

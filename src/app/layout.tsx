@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { NavbarWrapper } from '@/components/shared/NavbarWrapper';
+import { SnackbarProvider } from '@/components/shared/SnackbarProvider';
 
 export const metadata: Metadata = {
   title: 'NoPay - Offline-First Billing & QR Synchronization',
@@ -16,23 +17,25 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen flex flex-col bg-slate-50 text-slate-900 selection:bg-brand-blue selection:text-white">
-        <NavbarWrapper />
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {children}
-        </main>
+        <SnackbarProvider>
+          <NavbarWrapper />
+          <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            {children}
+          </main>
 
-        <footer className="border-t border-slate-200 bg-white py-6 mt-12 text-center text-xs text-slate-500">
-          <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <span className="font-bold text-navy-900">NoPay</span> &copy; 2026. Offline-First POS & QR Payment System.
+          <footer className="border-t border-slate-200 bg-white py-6 mt-12 text-center text-xs text-slate-500">
+            <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <span className="font-bold text-navy-900">NoPay</span> &copy; 2026. Offline-First POS & QR Payment System.
+              </div>
+              <div className="flex items-center gap-4 text-slate-500">
+                <span>Status: Resilient PWA</span>
+                <span>•</span>
+                <span>Offline-First System</span>
+              </div>
             </div>
-            <div className="flex items-center gap-4 text-slate-500">
-              <span>Status: Resilient PWA</span>
-              <span>•</span>
-              <span>Offline-First System</span>
-            </div>
-          </div>
-        </footer>
+          </footer>
+        </SnackbarProvider>
 
         {/* Service Worker Registration Script */}
         <script

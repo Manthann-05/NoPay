@@ -4,8 +4,10 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getOfflineTransactions, getPendingSyncQueue } from '@/offline/queue';
+import { subscribeToTransactionEvents } from '@/offline/liveChannel';
 import { Transaction } from '@/types';
 import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
+import { useSnackbar } from '@/components/shared/SnackbarProvider';
 import {
   Store,
   CreditCard,
@@ -26,6 +28,7 @@ export const dynamic = 'force-dynamic';
 
 export default function MerchantDashboardPage() {
   const router = useRouter();
+  const { showSnackbar } = useSnackbar();
   const [stats, setStats] = useState({
     todayRevenue: 0,
     totalSalesCount: 0,
@@ -37,6 +40,23 @@ export default function MerchantDashboardPage() {
 
   useEffect(() => {
     loadDashboardData();
+
+    // Subscribe to live local cross-window transactions
+    const unsubscribe = subscribeToTransactionEvents((detail) => {
+      loadDashboardData();
+      if (detail.action === 'CREATED') {
+        showSnackbar({
+          type: detail.isOffline ? 'pending' : 'success',
+          title: detail.isOffline ? 'New Offline Payment Detected' : 'New Online Payment Received',
+          description: `₹${detail.transaction.amount.toFixed(2)} (${detail.transaction.type}) - ${detail.transaction.transactionId} [${detail.transaction.status}]`,
+          durationMs: 5000,
+        });
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const loadDashboardData = async () => {
@@ -105,7 +125,7 @@ export default function MerchantDashboardPage() {
           </span>
           <h1 className="text-2xl sm:text-3xl font-black text-white">Merchant Dashboard</h1>
           <p className="text-xs text-slate-300 max-w-xl">
-            Offline-First Billing System. Create itemized QR bills, accept instant QR payments, and manage sync queues seamlessly.
+            Offline-First Billing System. Create itemized QR bills, accept instant QR payments, and maintain complete dual-sided transaction visibility.
           </p>
         </div>
 

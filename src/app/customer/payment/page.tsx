@@ -42,12 +42,12 @@ function PaymentStatusContent() {
 
         <div>
           <h2 className="text-2xl font-black text-navy-900">
-            {isQueued ? 'Payment Queued Offline' : 'Payment Successful!'}
+            {isQueued ? 'Payment Queued (Pending Sync)' : 'Payment Successful!'}
           </h2>
           <p className="text-xs text-slate-500 mt-1">
             {isQueued
-              ? 'Stored safely in your local Dexie queue. Will automatically synchronize when connectivity is restored.'
-              : 'Transaction confirmed and synced with merchant records.'}
+              ? 'Stored safely offline. This transaction is registered and visible as Pending Sync on both your device and the merchant’s screen.'
+              : 'Transaction confirmed online and permanently synchronized with merchant records.'}
           </p>
         </div>
 

@@ -1,5 +1,6 @@
 import { offlineDb } from './db';
 import { Transaction, OfflineSyncQueueItem, OfflineSyncQueueState } from '@/types';
+import { broadcastTransactionEvent } from './liveChannel';
 
 export async function addOfflineTransaction(txn: Transaction): Promise<OfflineSyncQueueItem> {
   // 1. Save to local IndexedDB transactions table
@@ -19,6 +20,14 @@ export async function addOfflineTransaction(txn: Transaction): Promise<OfflineSy
   queueItem.id = id;
 
   console.log(`📥 Transaction ${txn.transactionId} queued offline in IndexedDB.`);
+
+  // 3. Broadcast real-time event to merchant and customer listeners
+  broadcastTransactionEvent({
+    transaction: txn,
+    isOffline: true,
+    action: 'CREATED',
+  });
+
   return queueItem;
 }
 
@@ -69,6 +78,15 @@ export async function markSyncQueueState(
       failureReason: error,
       syncedAt: (state === 'CONFIRMED' || state === 'SYNCED') ? new Date().toISOString() : undefined,
     });
+
+    const updatedTxn = await offlineDb.transactions.where('transactionId').equals(transactionId).first();
+    if (updatedTxn) {
+      broadcastTransactionEvent({
+        transaction: updatedTxn,
+        isOffline: false,
+        action: state === 'CONFIRMED' || state === 'SYNCED' ? 'SYNCED' : state === 'FAILED' || state === 'REJECTED' ? 'FAILED' : 'UPDATED',
+      });
+    }
   }
 }
 
@@ -77,4 +95,3 @@ export async function getAllLocalTransactions(): Promise<Transaction[]> {
 }
 
 export const getOfflineTransactions = getAllLocalTransactions;
-

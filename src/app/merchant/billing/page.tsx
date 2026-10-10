@@ -6,6 +6,8 @@ import { QrCodeGenerator } from '@/components/qr/QrCodeGenerator';
 import { BarcodeScanner } from '@/components/qr/BarcodeScanner';
 import { Product, BillItem } from '@/types';
 import { encodeBillQr } from '@/lib/qr/payload';
+import { subscribeToTransactionEvents } from '@/offline/liveChannel';
+import { useSnackbar } from '@/components/shared/SnackbarProvider';
 import {
   Search,
   ShoppingCart,
@@ -17,6 +19,8 @@ import {
   X,
   Printer,
   PackageX,
+  Clock,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface CartItem extends BillItem {
@@ -26,6 +30,7 @@ interface CartItem extends BillItem {
 
 export default function MerchantPosBillingPage() {
   const router = useRouter();
+  const { showSnackbar } = useSnackbar();
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingCatalog, setLoadingCatalog] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
@@ -44,6 +49,7 @@ export default function MerchantPosBillingPage() {
   const [qrModalOpen, setQrModalOpen] = useState<boolean>(false);
   const [qrPayload, setQrPayload] = useState<string>('');
   const [generatedBillId, setGeneratedBillId] = useState<string>('');
+  const [billPaymentStatus, setBillPaymentStatus] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState<boolean>(false);
 
   // Merchant session
@@ -98,6 +104,24 @@ export default function MerchantPosBillingPage() {
     }
 
     initCatalogAndSession();
+
+    const unsubscribe = subscribeToTransactionEvents((detail) => {
+      if (detail.transaction.type === 'BILL_QR') {
+        if (detail.transaction.billId) {
+          setBillPaymentStatus(detail.transaction.status);
+        }
+        showSnackbar({
+          type: detail.isOffline ? 'pending' : 'success',
+          title: detail.isOffline ? 'Bill Payment Scanned (Pending Sync)' : 'Bill Payment Confirmed',
+          description: `₹${detail.transaction.amount.toFixed(2)} received for ${detail.transaction.billId || 'Bill'} [${detail.transaction.status}]`,
+          durationMs: 5000,
+        });
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const categories = ['ALL', ...Array.from(new Set(products.map((p) => p.category || 'General')))];
@@ -199,6 +223,7 @@ export default function MerchantPosBillingPage() {
     });
 
     setGeneratedBillId(billId);
+    setBillPaymentStatus(null);
     setQrPayload(encoded);
     setQrModalOpen(true);
 
@@ -512,6 +537,34 @@ export default function MerchantPosBillingPage() {
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 inline-block mx-auto">
               <QrCodeGenerator value={qrPayload} size={220} qrType="BILL" />
             </div>
+
+            {/* Live Customer Payment Status */}
+            {billPaymentStatus ? (
+              <div
+                className={`p-3.5 rounded-2xl flex items-center justify-center gap-2 text-xs font-bold ${
+                  billPaymentStatus === 'CONFIRMED' || billPaymentStatus === 'SYNCED'
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    : 'bg-amber-50 text-amber-800 border border-amber-200'
+                }`}
+              >
+                {billPaymentStatus === 'CONFIRMED' || billPaymentStatus === 'SYNCED' ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Customer Paid & Confirmed Online!</span>
+                  </>
+                ) : (
+                  <>
+                    <Clock className="w-4 h-4 text-amber-600 animate-pulse" />
+                    <span>Customer Scanned Offline: Queued (Pending Sync)</span>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="text-[11px] text-slate-400 font-medium flex items-center justify-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-slate-300" />
+                <span>Awaiting customer scan (Online & Offline supported)...</span>
+              </div>
+            )}
 
             <div className="flex gap-2">
               <button

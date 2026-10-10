@@ -3,8 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getOfflineTransactions } from '@/offline/queue';
+import { subscribeToTransactionEvents } from '@/offline/liveChannel';
 import { Transaction } from '@/types';
 import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
+import { useSnackbar } from '@/components/shared/SnackbarProvider';
 import { ArrowLeft, Clock, CheckCircle2, ShoppingBag, Search, WifiOff, RefreshCw } from 'lucide-react';
 
 // Force dynamic rendering to avoid pre-rendering issues with client-side hooks
@@ -12,12 +14,38 @@ export const dynamic = 'force-dynamic';
 
 export default function CustomerTransactionsPage() {
   const router = useRouter();
+  const { showSnackbar } = useSnackbar();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'CONFIRMED'>('ALL');
 
   useEffect(() => {
     loadTransactions();
+
+    const unsubscribe = subscribeToTransactionEvents((detail) => {
+      setTransactions((prev) => {
+        const map = new Map<string, Transaction>();
+        map.set(detail.transaction.transactionId, detail.transaction);
+        prev.forEach((t) => {
+          if (!map.has(t.transactionId)) map.set(t.transactionId, t);
+        });
+        return Array.from(map.values()).sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      });
+
+      if (detail.action === 'SYNCED') {
+        showSnackbar({
+          type: 'success',
+          title: 'Transaction Synchronized',
+          description: `₹${detail.transaction.amount.toFixed(2)} - ${detail.transaction.transactionId} is now verified on server.`,
+        });
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const loadTransactions = async () => {
