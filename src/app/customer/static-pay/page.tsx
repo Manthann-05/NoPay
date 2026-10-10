@@ -88,7 +88,7 @@ export default function CustomerStaticPayPage() {
           amount: numAmount,
           type: 'STATIC_QR',
           status: 'CONFIRMED',
-          idempotencyKey: transactionId,
+          idempotencyKey: crypto.randomUUID(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         })
@@ -98,7 +98,7 @@ export default function CustomerStaticPayPage() {
     }
 
     const txnId = `TXN-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
-    const idempotencyKey = `IDEM-${txnId}`;
+    const idempotencyKey = crypto.randomUUID();
 
     let customerName = 'Customer';
     let customerId: string | undefined;

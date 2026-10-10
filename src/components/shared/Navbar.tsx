@@ -158,31 +158,29 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+      <div className="w-full px-4 sm:px-6">
+        <div className="flex items-center justify-between h-16 gap-3">
           {/* Logo & Shop Name */}
-          <div className={`flex items-center ${
-            activeRole === 'MERCHANT' ? 'gap-1.5' : 'gap-3'
-          }`}>
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-navy-900 to-brand-blue flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
-                <QrCode className="w-6 h-6" />
+          <div className="flex items-center gap-2.5 shrink-0">
+            <Link href="/" className="flex items-center gap-2 group">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-navy-900 to-brand-blue flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
+                <QrCode className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-xl font-black tracking-tight text-navy-900 block leading-tight">
+                <span className="text-lg font-black tracking-tight text-navy-900 block leading-tight">
                   No<span className="text-brand-blue">Pay</span>
                 </span>
-                <span className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase block">
-                  Offline POS & Sync
+                <span className="text-[9px] font-semibold tracking-wider text-slate-500 uppercase block">
+                  Offline POS
                 </span>
               </div>
             </Link>
 
             {/* Merchant Shop Tag */}
             {activeRole === 'MERCHANT' && user?.merchantProfile?.shopName && (
-              <div className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-navy-50 text-navy-900 border border-navy-200 rounded-lg text-xs font-medium">
-                <Store className="w-3.5 h-3.5 text-brand-blue" />
-                <span className="font-semibold truncate max-w-[140px]">
+              <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 bg-navy-50 text-navy-900 border border-navy-200 rounded-lg text-xs font-medium shrink-0">
+                <Store className="w-3.5 h-3.5 text-brand-blue shrink-0" />
+                <span className="font-bold truncate max-w-[120px]">
                   {user.merchantProfile.shopName}
                 </span>
               </div>
@@ -190,9 +188,7 @@ export function Navbar() {
           </div>
 
           {/* Desktop Navigation Links */}
-          <nav className={`flex min-w-0 flex-1 items-center justify-center ${
-            activeRole === 'MERCHANT' ? 'gap-0 px-0' : 'gap-0.5 px-2'
-          }`}>
+          <nav className="flex min-w-0 items-center justify-center gap-1 overflow-x-auto scrollbar-none py-1">
             {user && currentNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href || Boolean(pathname?.startsWith(item.href + '/'));
@@ -206,25 +202,21 @@ export function Navbar() {
                       window.location.assign(item.href);
                     }
                   }}
-                  className={`flex shrink-0 items-center rounded-lg py-2 font-medium transition-colors ${
-                    activeRole === 'MERCHANT'
-                      ? 'gap-0.5 px-1 text-[11px]'
-                      : 'gap-1.5 px-2.5 text-sm'
-                  } ${
+                  className={`flex shrink-0 items-center rounded-lg py-1.5 px-2 text-xs font-medium transition-all gap-1.5 ${
                     isActive
-                      ? 'bg-blue-50 text-brand-blue font-semibold'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-blue-50 text-brand-blue font-bold shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-brand-blue' : 'text-slate-400'}`} />
-                  <span>{item.label}</span>
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-brand-blue' : 'text-slate-400'}`} />
+                  <span className="whitespace-nowrap">{item.label}</span>
                 </Link>
               );
             })}
           </nav>
 
           {/* Right Header Actions (Offline Badge, Role Switcher, Auth Buttons) */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 shrink-0">
             <OfflineBadge />
 
             {!isLoading && (
@@ -234,17 +226,15 @@ export function Navbar() {
                     <RoleSwitcher
                       currentRole={activeRole}
                       roles={roles}
-                      compact={activeRole === 'MERCHANT'}
+                      compact={true}
                       onRoleChanged={(newRole) => setUser((current) => (
                         current ? { ...current, activeRole: newRole } : current
                       ))}
                     />
                   </div>
 
-                  <div className={`relative flex items-center border-l border-slate-200 ${
-                    activeRole === 'MERCHANT' ? 'gap-1 pl-1.5' : 'gap-2 pl-2'
-                  }`}>
-                    <div className="hidden sm:flex flex-col text-right">
+                  <div className="relative flex items-center border-l border-slate-200 gap-2 pl-2.5">
+                    <div className="hidden xl:flex flex-col text-right">
                       <span className="text-xs font-bold text-slate-800 leading-tight">
                         {user.name}
                       </span>
@@ -254,9 +244,7 @@ export function Navbar() {
                     <button
                       onClick={handleLogout}
                       title="Logout"
-                      className={`text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors ${
-                        activeRole === 'MERCHANT' ? 'p-1.5' : 'p-2'
-                      }`}
+                      className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
                     </button>

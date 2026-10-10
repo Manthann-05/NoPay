@@ -98,7 +98,7 @@ export default function CustomerBillDetailPage() {
     setError(null);
 
     const txnId = bill.transactionId || `TXN-${Date.now()}`;
-    const idempotencyKey = `IDEM-${txnId}-${bill.billId}`;
+    const idempotencyKey = crypto.randomUUID();
 
     let customerName = 'Customer';
     let customerId: string | undefined;
