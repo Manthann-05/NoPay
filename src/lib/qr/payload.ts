@@ -37,11 +37,17 @@ interface CompactBillData {
 
 // ─── Public result types ─────────────────────────────────────────────────────
 
-export type NoPayQrType = 'MERCHANT' | 'BILL';
+export type NoPayQrType = 'MERCHANT' | 'BILL' | 'CUSTOMER';
 
 export interface NoPayMerchantQrResult {
   type: 'MERCHANT';
   merchantId: string;
+}
+
+export interface NoPayCustomerQrResult {
+  type: 'CUSTOMER';
+  customerId: string;
+  customerName?: string;
 }
 
 export interface NoPayBillQrResult {
@@ -59,7 +65,7 @@ export interface NoPayBillQrResult {
   expiresAt?: string;
 }
 
-export type NoPayQrResult = NoPayMerchantQrResult | NoPayBillQrResult;
+export type NoPayQrResult = NoPayMerchantQrResult | NoPayBillQrResult | NoPayCustomerQrResult;
 
 export interface ExternalQrResult {
   type: 'EXTERNAL';
@@ -173,6 +179,16 @@ export function parseNoPayQr(raw: string): NoPayQrResult | null {
       } satisfies NoPayMerchantQrResult;
     }
 
+    if (qrType === 'CUSTOMER') {
+      if (!id || id.trim() === '') return null;
+      const nameParam = parsed.searchParams.get('name');
+      return {
+        type: 'CUSTOMER',
+        customerId: decodeURIComponent(id.trim()),
+        customerName: nameParam ? decodeURIComponent(nameParam) : undefined,
+      } satisfies NoPayCustomerQrResult;
+    }
+
     if (qrType === 'BILL') {
       if (!id || id.trim() === '') return null;
 
@@ -247,6 +263,16 @@ export function encodeStaticMerchantQr(merchantId: string): string {
 }
 
 /**
+ * Generate a Static Customer QR string.
+ * Format: NOPAY://v1/customer/<customerId>?name=<customerName>
+ */
+export function encodeStaticCustomerQr(customerId: string, name?: string): string {
+  if (!customerId) throw new Error('customerId is required');
+  const base = `${NOPAY_SCHEME}${NOPAY_VERSION}/customer/${encodeURIComponent(customerId)}`;
+  return name ? `${base}?name=${encodeURIComponent(name)}` : base;
+}
+
+/**
  * Generate a Bill QR string.
  * Format: NOPAY://v1/bill/<billId>?d=<base64url-compact>
  */
@@ -297,6 +323,9 @@ export function parseQrPayload(raw: string): DecodedQrPayload | null {
       merchantName: '',
     } as StaticMerchantQrPayload;
   }
+
+  // CUSTOMER QRs are not bill/merchant payloads — return null for legacy compat
+  if (noPayResult.type === 'CUSTOMER') return null;
 
   return {
     type: 'BILL',

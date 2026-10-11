@@ -22,7 +22,7 @@ export default function CustomerScanPage() {
       // Replace the scanner route so the payment form is the next screen
       // and a browser refresh cannot reopen the camera modal.
       window.setTimeout(() => {
-        if (result.type === 'MERCHANT' || result.type === 'EXTERNAL') {
+        if (result.type === 'MERCHANT' || result.type === 'EXTERNAL' || result.type === 'CUSTOMER') {
           router.replace('/customer/static-pay');
         } else {
           router.replace(`/customer/bill/${encodeURIComponent(result.billId)}`);

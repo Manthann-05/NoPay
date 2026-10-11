@@ -58,6 +58,9 @@ export default function MerchantPosBillingPage() {
     shopName: 'NoPay Store POS',
   });
 
+  // Barcode Scan Notification
+  const [barcodeToast, setBarcodeToast] = useState<{ type: 'success' | 'warn'; text: string } | null>(null);
+
   useEffect(() => {
     async function initCatalogAndSession() {
       setLoadingCatalog(true);
@@ -271,16 +274,48 @@ export default function MerchantPosBillingPage() {
 
   const handleBarcodeDetected = (rawText: string) => {
     setScannerOpen(false);
-    const match = products.find((p) => p.barcode === rawText || p._id === rawText);
+    const trimmed = rawText.trim();
+    const match = products.find(
+      (p) => p.barcode === trimmed || p._id === trimmed || (p.barcode && p.barcode.endsWith(trimmed))
+    );
     if (match) {
       addToCart(match);
+      setBarcodeToast({
+        type: 'success',
+        text: `✓ Scanned & Added: ${match.name} (₹${match.price.toFixed(2)}) to active cart`,
+      });
+      setTimeout(() => setBarcodeToast(null), 5000);
     } else {
-      alert(`Barcode "${rawText}" not found in inventory.`);
+      setBarcodeToast({
+        type: 'warn',
+        text: `Barcode "${trimmed}" not found in current inventory. Add as a custom item below.`,
+      });
+      setCustomName(`Item (${trimmed.slice(-6)})`);
+      setTimeout(() => setBarcodeToast(null), 7000);
     }
   };
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6">
+    <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-4">
+      {/* Barcode notification banner */}
+      {barcodeToast && (
+        <div
+          className={`p-3.5 rounded-2xl text-xs font-bold flex items-center justify-between shadow-sm animate-fade-in ${
+            barcodeToast.type === 'success'
+              ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+              : 'bg-amber-50 border border-amber-200 text-amber-800'
+          }`}
+        >
+          <span>{barcodeToast.text}</span>
+          <button
+            onClick={() => setBarcodeToast(null)}
+            className="text-xs font-black px-2 py-0.5 hover:opacity-75"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* LEFT COLUMN: Catalog Workspace */}
         <div className="flex-1 w-full space-y-5">
@@ -289,14 +324,14 @@ export default function MerchantPosBillingPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-xl font-black text-navy-900">POS Inventory Catalog</h1>
-                <p className="text-xs text-slate-400">Select items to add to active cart</p>
+                <p className="text-xs text-slate-400">Scan or select items to add to active cart</p>
               </div>
               <button
                 onClick={() => setScannerOpen(true)}
-                className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all"
+                className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all"
               >
                 <Scan className="w-4 h-4 text-brand-lightBlue" />
-                <span>Barcode Scan</span>
+                <span>Scan Barcode</span>
               </button>
             </div>
 
@@ -308,8 +343,16 @@ export default function MerchantPosBillingPage() {
                   placeholder="Search products by name or barcode..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-navy-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                  className="w-full pl-10 pr-20 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-navy-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-blue"
                 />
+                <button
+                  type="button"
+                  onClick={() => setScannerOpen(true)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-brand-blue/10 hover:bg-brand-blue/20 text-brand-blue rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors"
+                >
+                  <Scan className="w-3 h-3" />
+                  <span>Scan</span>
+                </button>
               </div>
             </div>
 

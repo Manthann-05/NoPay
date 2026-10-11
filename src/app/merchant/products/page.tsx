@@ -19,8 +19,11 @@ export default function MerchantProductsPage() {
   const [category, setCategory] = useState('');
   const [barcode, setBarcode] = useState('');
 
-  // Scanner Modal
+  // Scanner Modal (in Add/Edit form)
   const [scannerOpen, setScannerOpen] = useState(false);
+  // Global Scanner Modal (on main products page)
+  const [globalScannerOpen, setGlobalScannerOpen] = useState(false);
+  const [scanFeedback, setScanFeedback] = useState<{ type: 'found' | 'not_found'; text: string } | null>(null);
 
   useEffect(() => {
     async function loadProducts() {
@@ -138,21 +141,80 @@ export default function MerchantProductsPage() {
       (p.barcode && p.barcode.includes(search))
   );
 
+  const handleGlobalBarcodeDetected = (rawText: string) => {
+    setGlobalScannerOpen(false);
+    const trimmed = rawText.trim();
+    const match = products.find(
+      (p) => p.barcode === trimmed || p._id === trimmed || (p.barcode && p.barcode.endsWith(trimmed))
+    );
+
+    if (match) {
+      setSearch(match.name);
+      setScanFeedback({
+        type: 'found',
+        text: `✓ Product Found: "${match.name}" (Barcode: ${match.barcode || '—'}, Price: ₹${match.price}, Stock: ${match.stock} units)`,
+      });
+      setTimeout(() => setScanFeedback(null), 6000);
+    } else {
+      setScanFeedback({
+        type: 'not_found',
+        text: `Barcode "${trimmed}" not found in inventory. You can fill in the details below to add it now.`,
+      });
+      setTimeout(() => setScanFeedback(null), 8000);
+      // Pre-fill and open Add modal
+      setEditingId(null);
+      setName('');
+      setPrice('');
+      setStock('20');
+      setCategory('General');
+      setBarcode(trimmed);
+      setModalOpen(true);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6">
+      {/* Scan Feedback Banner */}
+      {scanFeedback && (
+        <div
+          className={`p-3.5 rounded-2xl text-xs font-bold flex items-center justify-between shadow-sm animate-fade-in ${
+            scanFeedback.type === 'found'
+              ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+              : 'bg-amber-50 border border-amber-200 text-amber-800'
+          }`}
+        >
+          <span>{scanFeedback.text}</span>
+          <button
+            onClick={() => setScanFeedback(null)}
+            className="text-xs font-black px-2 py-0.5 hover:opacity-75"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-navy-900">Product Inventory</h1>
           <p className="text-xs text-slate-400">Manage item prices, barcodes, and stock levels</p>
         </div>
-        <button
-          onClick={handleOpenAdd}
-          className="px-5 py-3 bg-brand-blue hover:bg-brand-darkBlue text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center justify-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add New Product</span>
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setGlobalScannerOpen(true)}
+            className="px-4 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center justify-center gap-2"
+          >
+            <Scan className="w-4 h-4 text-brand-lightBlue" />
+            <span>Scan Barcode</span>
+          </button>
+          <button
+            onClick={handleOpenAdd}
+            className="px-5 py-3 bg-brand-blue hover:bg-brand-darkBlue text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center justify-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add New Product</span>
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -164,8 +226,16 @@ export default function MerchantProductsPage() {
             placeholder="Search products by name, category, or barcode..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-navy-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-blue"
+            className="w-full pl-10 pr-20 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-navy-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-blue"
           />
+          <button
+            type="button"
+            onClick={() => setGlobalScannerOpen(true)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-brand-blue/10 hover:bg-brand-blue/20 text-brand-blue rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors"
+          >
+            <Scan className="w-3 h-3" />
+            <span>Scan</span>
+          </button>
         </div>
       </div>
 
@@ -339,6 +409,13 @@ export default function MerchantProductsPage() {
             setScannerOpen(false);
           }}
           onClose={() => setScannerOpen(false)}
+        />
+      )}
+
+      {globalScannerOpen && (
+        <BarcodeScanner
+          onDetected={handleGlobalBarcodeDetected}
+          onClose={() => setGlobalScannerOpen(false)}
         />
       )}
     </div>

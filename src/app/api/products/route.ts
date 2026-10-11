@@ -25,11 +25,23 @@ export async function GET(req: Request) {
       query.name = { $regex: search, $options: 'i' };
     }
 
-    if (category && category !== 'All') {
-      query.category = category;
+    let products = await Product.find(query).sort({ updatedAt: -1 }).lean();
+
+    // If merchant has no products at all in DB, auto-seed based on their store type
+    if (products.length === 0 && !search && !barcode && (!category || category === 'All') && session.merchantProfileId) {
+      try {
+        const { MerchantProfile } = await import('@/models/MerchantProfile');
+        const { seedMerchantProducts } = await import('@/lib/db/merchantCatalogs');
+        const profile = await MerchantProfile.findById(session.merchantProfileId);
+        if (profile) {
+          await seedMerchantProducts(profile._id, profile.shopName);
+          products = await Product.find(query).sort({ updatedAt: -1 }).lean();
+        }
+      } catch (seedErr) {
+        console.warn('Could not auto-seed on GET products:', seedErr);
+      }
     }
 
-    const products = await Product.find(query).sort({ updatedAt: -1 }).lean();
     return NextResponse.json({ products });
   } catch (err: unknown) {
     if (typeof err === 'object' && err && 'statusCode' in err) {
