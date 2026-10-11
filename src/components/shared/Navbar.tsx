@@ -37,6 +37,9 @@ const CUSTOMER_ROUTE_PATHS = [
   '/customer/scan',
   '/customer/transactions',
   '/customer/profile',
+  '/customer/static-pay',
+  '/customer/bill',
+  '/customer/payment',
 ];
 
 export function Navbar() {

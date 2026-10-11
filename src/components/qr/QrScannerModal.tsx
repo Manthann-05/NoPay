@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { parseScannedQr, ScannedQrResult } from '@/lib/qr/payload';
+import { NoPayQrType, parseScannedQr, ScannedQrResult } from '@/lib/qr/payload';
 import { Image as ImageIcon, AlertCircle, QrCode, X } from 'lucide-react';
 
 interface QrScannerModalProps {
   onScanSuccess: (result: ScannedQrResult, rawText: string) => void;
   onClose: () => void;
+  allowedTypes?: NoPayQrType[];
 }
 
 const READER_ELEMENT_ID = 'nopay-qr-reader';
@@ -23,7 +24,11 @@ function stopVideoTracks(elementId: string) {
   });
 }
 
-export function QrScannerModal({ onScanSuccess, onClose }: QrScannerModalProps) {
+export function QrScannerModal({
+  onScanSuccess,
+  onClose,
+  allowedTypes,
+}: QrScannerModalProps) {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(true);
   const [scanStatus, setScanStatus] = useState<string>('Pointing at QR code…');
@@ -99,8 +104,12 @@ export function QrScannerModal({ onScanSuccess, onClose }: QrScannerModalProps) 
 
       const result = parseScannedQr(decodedText);
       if (result) {
+        if (allowedTypes && !allowedTypes.includes(result.type)) {
+          setScanStatus(`This NoPay QR is for ${result.type.toLowerCase()}, not this screen`);
+          return;
+        }
         hasScannedRef.current = true;
-        setScanStatus(result.type === 'EXTERNAL' ? 'Payment QR detected' : 'NoPay QR detected');
+        setScanStatus('NoPay QR detected');
         stopCamera().then(() => {
           if (isMountedRef.current) {
             onScanSuccessRef.current(result, decodedText);
@@ -175,7 +184,7 @@ export function QrScannerModal({ onScanSuccess, onClose }: QrScannerModalProps) 
         );
       }
     }
-  }, [stopCamera]);
+  }, [allowedTypes, stopCamera]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -209,10 +218,14 @@ export function QrScannerModal({ onScanSuccess, onClose }: QrScannerModalProps) 
       try {
         const result = await scanner.scanFile(file, false);
         const parsed = parseScannedQr(result);
-        if (parsed) {
+        if (parsed && (!allowedTypes || allowedTypes.includes(parsed.type))) {
           onScanSuccessRef.current(parsed, result);
         } else {
-          setImageError('QR code not recognized. Please scan a valid NoPay QR.');
+          setImageError(
+            parsed
+              ? `This NoPay QR is for ${parsed.type.toLowerCase()}, not this screen.`
+              : 'Only NoPay QR codes are supported. External bank or UPI QR codes are not accepted.'
+          );
           if (isMountedRef.current) {
             void startCamera();
           }
@@ -329,7 +342,7 @@ export function QrScannerModal({ onScanSuccess, onClose }: QrScannerModalProps) 
             )}
 
             <p className="text-[11px] text-slate-400 text-center mt-2">
-              Use a screenshot, photo, or saved image of a NoPay QR
+              Only NoPay QR codes are accepted; external bank and UPI QRs are rejected.
             </p>
           </div>
         </div>

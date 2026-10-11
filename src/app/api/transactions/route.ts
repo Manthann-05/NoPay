@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth/jwt';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { Transaction } from '@/models/Transaction';
+import { AutoPayAttempt } from '@/models/AutoPayAttempt';
 
 export async function GET(req: Request) {
   const session = await getSessionUser();
@@ -33,7 +34,26 @@ export async function GET(req: Request) {
       .limit(limit)
       .lean();
 
-    return NextResponse.json({ transactions });
+    const billIds = transactions.flatMap((transaction) =>
+      transaction.billId ? [transaction.billId] : []
+    );
+    const attempts = billIds.length
+      ? await AutoPayAttempt.find({ billId: { $in: billIds } })
+          .select('billId status paymentAfter')
+          .lean()
+      : [];
+    const attemptsByBill = new Map(attempts.map((attempt) => [attempt.billId, attempt]));
+
+    return NextResponse.json({
+      transactions: transactions.map((transaction) => {
+        const attempt = transaction.billId ? attemptsByBill.get(transaction.billId) : undefined;
+        return {
+          ...transaction,
+          autopayStatus: attempt?.status,
+          autopayPaymentAfter: attempt?.paymentAfter,
+        };
+      }),
+    });
   } catch (err) {
     console.error('Transactions GET Error:', err);
     return NextResponse.json({ error: 'Failed to fetch transactions' }, { status: 500 });

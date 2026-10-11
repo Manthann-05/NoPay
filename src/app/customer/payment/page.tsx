@@ -4,6 +4,8 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Transaction } from '@/types';
 import { CheckCircle2, Clock, ShieldCheck, ArrowRight, RefreshCw, Home, FileText } from 'lucide-react';
+import { encodeTransactionQr } from '@/lib/qr/payload';
+import { QrCodeGenerator } from '@/components/qr/QrCodeGenerator';
 
 // Force dynamic rendering to avoid pre-rendering issues with client-side hooks
 export const dynamic = 'force-dynamic';
@@ -42,12 +44,12 @@ function PaymentStatusContent() {
 
         <div>
           <h2 className="text-2xl font-black text-navy-900">
-            {isQueued ? 'Payment Queued (Pending Sync)' : 'Payment Successful!'}
+            {isQueued ? 'Offline Record Pending' : 'Payment Record Synced'}
           </h2>
           <p className="text-xs text-slate-500 mt-1">
             {isQueued
-              ? 'Stored safely offline. This transaction is registered and visible as Pending Sync on both your device and the merchant’s screen.'
-              : 'Transaction confirmed online and permanently synchronized with merchant records.'}
+              ? 'Show the QR below to the merchant so they can save an independent pending copy on their device. NoPay does not transfer or verify money.'
+              : 'This payment record was saved to the NoPay ledger. NoPay does not transfer or verify money.'}
           </p>
         </div>
 
@@ -68,10 +70,20 @@ function PaymentStatusContent() {
               </div>
             )}
             <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-200">
-              <span className="text-slate-600 font-extrabold">Amount Paid</span>
+              <span className="text-slate-600 font-extrabold">Amount</span>
               <span className="text-xl font-black text-brand-blue">₹{txn.amount.toFixed(2)}</span>
             </div>
           </div>
+        )}
+
+        {isQueued && txn?.transactionId && txn.merchantId && txn.idempotencyKey && (
+          <QrCodeGenerator
+            value={encodeTransactionQr(txn)}
+            size={220}
+            title="Show this record to the merchant"
+            subtitle="Merchant scans it to save a separate pending copy. This QR is a record, not proof of payment."
+            showActions={false}
+          />
         )}
 
         <div className="space-y-3 pt-2">

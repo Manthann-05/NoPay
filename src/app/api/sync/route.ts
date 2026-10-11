@@ -8,6 +8,7 @@ import { Bill } from '@/models/Bill';
 import { MerchantProfile } from '@/models/MerchantProfile';
 import { TransactionSyncSchema } from '@/lib/validation/schemas';
 import { isBillExpired } from '@/lib/status/labels';
+import { scheduleBillAutoPay, type AutoPayScheduleResult } from '@/lib/payments/autopay';
 
 function amountsMatch(a: number, b: number): boolean {
   return Math.abs(Number(a) - Number(b)) < 0.005;
@@ -34,6 +35,19 @@ export async function POST(req: Request) {
 
     if (existingTxn) {
       if (existingTxn.idempotencyKey === validated.idempotencyKey) {
+        if (String(existingTxn.customerId) !== String(session.userId)) {
+          return NextResponse.json(
+            { success: false, error: 'This idempotency key belongs to another customer.' },
+            { status: 409 }
+          );
+        }
+        let autoPay: AutoPayScheduleResult = { status: 'SKIPPED', reason: 'not_eligible' };
+        if (existingTxn.type === 'BILL_QR' && existingTxn.billId) {
+          const existingBill = await Bill.findOne({ billId: existingTxn.billId });
+          if (existingBill && existingBill.status !== 'PAID') {
+            autoPay = await scheduleBillAutoPay(existingBill, existingTxn);
+          }
+        }
         await SyncLog.create({
           transactionId: existingTxn.transactionId,
           idempotencyKey: validated.idempotencyKey,
@@ -46,6 +60,7 @@ export async function POST(req: Request) {
           idempotent: true,
           message: 'Transaction already processed',
           transaction: existingTxn,
+          autoPay,
         });
       }
 
@@ -65,14 +80,9 @@ export async function POST(req: Request) {
       merchant = await MerchantProfile.findOne({ userId: validated.merchantId });
     }
 
-    // If still not found (e.g. mock ID SHOP123 during testing or fallback), find first active merchant
-    if (!merchant) {
-      merchant = await MerchantProfile.findOne({ active: { $ne: false } });
-    }
-
     if (!merchant) {
       return NextResponse.json(
-        { success: false, error: 'Merchant profile could not be verified on server.' },
+        { success: false, error: 'The transaction merchant ID does not match a registered merchant.' },
         { status: 400 }
       );
     }
@@ -80,6 +90,8 @@ export async function POST(req: Request) {
     const merchantName = merchant.shopName;
     let amount = validated.amount;
     let billSummary;
+    let billForAutoPay = null;
+    let paymentStatus: 'UNVERIFIED' | 'PENDING' = 'UNVERIFIED';
 
     if (validated.type === 'STATIC_QR') {
       if (!(amount > 0)) {
@@ -95,68 +107,58 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: false, error: 'Bill QR is missing bill details.' }, { status: 400 });
       }
 
-      let bill = await Bill.findOne({ billId: validated.billId });
-      if (!bill) {
-        // If merchant generated bill offline and customer syncs before merchant device connects:
-        // Automatically create bill on server using verified transaction amount & merchant to eliminate sync failure
-        bill = await Bill.create({
-          billId: validated.billId,
-          transactionId: validated.transactionId,
-          merchantId: merchant._id,
-          merchantName,
-          items: [
-            {
-              name: 'Itemized QR Bill',
-              quantity: 1,
-              price: validated.amount,
-            },
-          ],
-          subtotal: validated.amount,
-          discount: 0,
-          tax: 0,
-          total: validated.amount,
-          status: 'PAID',
-        });
-      }
+      const bill = await Bill.findOne({ billId: validated.billId });
+      if (bill) {
+        if (String(bill.merchantId) !== String(merchant._id)) {
+          return NextResponse.json(
+            { success: false, error: 'This bill does not belong to the scanned merchant.' },
+            { status: 400 }
+          );
+        }
 
-      if (String(bill.merchantId) !== String(merchant._id)) {
-        return NextResponse.json(
-          { success: false, error: 'This bill does not belong to the scanned merchant.' },
-          { status: 400 }
-        );
-      }
+        if (bill.status === 'EXPIRED' || bill.status === 'CANCELLED') {
+          return NextResponse.json({ success: false, error: 'Bill Expired' }, { status: 400 });
+        }
 
-      if (bill.status === 'EXPIRED' || bill.status === 'CANCELLED') {
-        return NextResponse.json({ success: false, error: 'Bill Expired' }, { status: 400 });
-      }
+        if (isBillExpired(bill.expiresAt)) {
+          bill.status = 'EXPIRED';
+          await bill.save();
+          return NextResponse.json({ success: false, error: 'Bill Expired' }, { status: 400 });
+        }
 
-      if (isBillExpired(bill.expiresAt)) {
-        bill.status = 'EXPIRED';
+        if (bill.transactionId && bill.transactionId !== validated.transactionId) {
+          return NextResponse.json(
+            { success: false, error: 'This transaction does not match the bill.' },
+            { status: 400 }
+          );
+        }
+
+        if (bill.status === 'PAID') {
+          return NextResponse.json({ success: false, error: 'This bill has already been paid.' }, { status: 409 });
+        }
+
+        if (!amountsMatch(validated.amount, bill.total)) {
+          return NextResponse.json(
+            { success: false, error: 'Amount does not match the bill total.' },
+            { status: 400 }
+          );
+        }
+
+        if (bill.customerId && String(bill.customerId) !== String(session.userId)) {
+          return NextResponse.json({ success: false, error: 'This bill is assigned to another customer.' }, { status: 409 });
+        }
+
+        amount = Number(bill.total);
+        billSummary = {
+          itemsCount: bill.items.length,
+          total: bill.total,
+        };
+        bill.customerId = new mongoose.Types.ObjectId(session.userId);
+        bill.status = 'PENDING';
         await bill.save();
-        return NextResponse.json({ success: false, error: 'Bill Expired' }, { status: 400 });
+        billForAutoPay = bill;
+        paymentStatus = 'PENDING';
       }
-
-      if (bill.transactionId && bill.transactionId !== validated.transactionId) {
-        return NextResponse.json(
-          { success: false, error: 'This transaction does not match the bill.' },
-          { status: 400 }
-        );
-      }
-
-      if (!amountsMatch(validated.amount, bill.total)) {
-        return NextResponse.json(
-          { success: false, error: 'Amount does not match the bill total.' },
-          { status: 400 }
-        );
-      }
-
-      amount = Number(bill.total);
-      billSummary = {
-        itemsCount: bill.items.length,
-        total: bill.total,
-      };
-      bill.status = 'PAID';
-      await bill.save();
     }
 
     const newTxn = await Transaction.create({
@@ -170,6 +172,7 @@ export async function POST(req: Request) {
       amount,
       type: validated.type,
       status: 'CONFIRMED',
+      paymentStatus,
       idempotencyKey: validated.idempotencyKey,
       offlineCreated: validated.offlineCreated,
       syncedAt: new Date(),
@@ -182,11 +185,20 @@ export async function POST(req: Request) {
       state: 'CONFIRMED',
     });
 
+    let autoPay: AutoPayScheduleResult = {
+      status: 'SKIPPED',
+      reason: 'unverified_bill_or_static_qr',
+    };
+    if (billForAutoPay) {
+      autoPay = await scheduleBillAutoPay(billForAutoPay, newTxn);
+    }
+
     return NextResponse.json({
       success: true,
       idempotent: false,
-      message: 'Transaction synchronized',
+      message: 'Transaction record synchronized; payment remains unverified until a provider capture.',
       transaction: newTxn,
+      autoPay,
     });
   } catch (err: unknown) {
     if (typeof err === 'object' && err && (err as { name?: string }).name === 'ZodError') {

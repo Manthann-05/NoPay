@@ -7,7 +7,7 @@ import { QrCodeGenerator } from '@/components/qr/QrCodeGenerator';
 import { encodeStaticCustomerQr } from '@/lib/qr/payload';
 import { getLocalSession, clearLocalSession } from '@/offline/session';
 import { notifyAuthStateChanged } from '@/lib/auth/client';
-import { User as UserIcon, ArrowLeft, LogOut, ShieldCheck, Mail, QrCode } from 'lucide-react';
+import { User as UserIcon, ArrowLeft, LogOut, ShieldCheck, Mail, QrCode, CreditCard } from 'lucide-react';
 
 // Force dynamic rendering to avoid pre-rendering issues with client-side hooks
 export const dynamic = 'force-dynamic';
@@ -140,6 +140,19 @@ export default function CustomerProfilePage() {
           <span>Sign Out</span>
         </button>
       </div>
+
+      <button
+        onClick={() => router.push('/customer/autopay')}
+        className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:border-brand-blue"
+      >
+        <span className="rounded-xl bg-blue-50 p-2 text-blue-700">
+          <CreditCard className="h-5 w-5" />
+        </span>
+        <span>
+          <span className="block text-sm font-bold text-navy-900">Merchant AutoPay</span>
+          <span className="block text-xs text-slate-500">Manage per-merchant UPI mandates and revocation</span>
+        </span>
+      </button>
 
       {/* Customer Static QR Card */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-card p-6 space-y-4">

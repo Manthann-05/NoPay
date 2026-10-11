@@ -7,6 +7,7 @@ import { User } from '@/types';
 import { clearLocalSession } from '@/offline/session';
 import { notifyAuthStateChanged } from '@/lib/auth/client';
 import { Store, Building2, MapPin, ShieldCheck, LogOut, ArrowLeft } from 'lucide-react';
+import { RouteAccountForm } from './route-account-form';
 
 export default function MerchantProfilePage() {
   const router = useRouter();
@@ -55,6 +56,8 @@ export default function MerchantProfilePage() {
             <h2 className="text-xl font-black text-navy-900">{user?.name || 'Merchant Account'}</h2>
             <p className="text-xs text-slate-500">ID: {user?.merchantProfileId || 'SHOP123'}</p>
           </div>
+
+          <RouteAccountForm />
         </div>
 
         {/* Role Switcher Section */}

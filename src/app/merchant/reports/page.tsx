@@ -78,18 +78,24 @@ export default function MerchantReportsPage() {
     : transactions.filter((t) => new Date(t.createdAt) >= startOf(period as 'week' | 'month'));
 
   // --- Metrics ---
-  const totalRevenue = filtered.reduce((sum, t) => sum + t.amount, 0);
-  const billQrRevenue = filtered.filter((t) => t.type === 'BILL_QR').reduce((sum, t) => sum + t.amount, 0);
-  const staticQrRevenue = filtered.filter((t) => t.type === 'STATIC_QR').reduce((sum, t) => sum + t.amount, 0);
-  const txnCount = filtered.length;
-  const avgOrder = txnCount > 0 ? totalRevenue / txnCount : 0;
-  const pendingCount = transactions.filter((t) => t.status === 'PENDING_SYNC').length;
+  const ledgerRecords = filtered.filter((t) => t.status === 'CONFIRMED' || t.status === 'SYNCED');
+  const recordedAmount = ledgerRecords.reduce((sum, t) => sum + t.amount, 0);
+  const billQrAmount = ledgerRecords.filter((t) => t.type === 'BILL_QR').reduce((sum, t) => sum + t.amount, 0);
+  const staticQrAmount = ledgerRecords.filter((t) => t.type === 'STATIC_QR').reduce((sum, t) => sum + t.amount, 0);
+  const txnCount = ledgerRecords.length;
+  const avgRecord = txnCount > 0 ? recordedAmount / txnCount : 0;
+  const pendingCount = transactions.filter((t) =>
+    t.status === 'LOCAL_CREATED' ||
+    t.status === 'PENDING_SYNC' ||
+    t.status === 'SYNCING' ||
+    t.status === 'RETRY_PENDING'
+  ).length;
 
-  const billQrPercent = totalRevenue > 0 ? (billQrRevenue / totalRevenue) * 100 : 0;
-  const staticQrPercent = totalRevenue > 0 ? (staticQrRevenue / totalRevenue) * 100 : 0;
+  const billQrPercent = recordedAmount > 0 ? (billQrAmount / recordedAmount) * 100 : 0;
+  const staticQrPercent = recordedAmount > 0 ? (staticQrAmount / recordedAmount) * 100 : 0;
 
   // --- Daily breakdown bar chart ---
-  const dailyMap = groupByDay(filtered);
+  const dailyMap = groupByDay(ledgerRecords);
   const dailyEntries = Object.entries(dailyMap).slice(-7); // last 7 days max
   const maxDailyVal = Math.max(...dailyEntries.map(([, v]) => v), 1);
 
@@ -98,8 +104,8 @@ export default function MerchantReportsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-navy-900">Sales Reports & Analytics</h1>
-          <p className="text-xs text-slate-400">Revenue breakdown — online and offline channels</p>
+          <h1 className="text-2xl font-black text-navy-900">Transaction Record Reports</h1>
+          <p className="text-xs text-slate-400">Server-synced records only; NoPay does not verify money settlement.</p>
         </div>
         <button
           onClick={loadTransactions}
@@ -133,24 +139,24 @@ export default function MerchantReportsPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-          <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Gross Sales</span>
-          <p className="text-2xl font-black text-navy-900">₹{totalRevenue.toFixed(0)}</p>
-          <p className="text-[11px] text-slate-500">{txnCount} orders</p>
+          <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Recorded Amount</span>
+          <p className="text-2xl font-black text-navy-900">₹{recordedAmount.toFixed(0)}</p>
+          <p className="text-[11px] text-slate-500">{txnCount} server-synced records</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-          <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Avg Order</span>
-          <p className="text-2xl font-black text-emerald-600">₹{avgOrder.toFixed(0)}</p>
+          <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Average Record</span>
+          <p className="text-2xl font-black text-emerald-600">₹{avgRecord.toFixed(0)}</p>
           <p className="text-[11px] text-slate-500">per transaction</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
           <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Bill QR</span>
-          <p className="text-2xl font-black text-brand-blue">₹{billQrRevenue.toFixed(0)}</p>
-          <p className="text-[11px] text-slate-500">POS checkout</p>
+          <p className="text-2xl font-black text-brand-blue">₹{billQrAmount.toFixed(0)}</p>
+          <p className="text-[11px] text-slate-500">server-synced records</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
           <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Static QR</span>
-          <p className="text-2xl font-black text-purple-600">₹{staticQrRevenue.toFixed(0)}</p>
-          <p className="text-[11px] text-slate-500">counter scans</p>
+          <p className="text-2xl font-black text-purple-600">₹{staticQrAmount.toFixed(0)}</p>
+          <p className="text-[11px] text-slate-500">server-synced records</p>
         </div>
       </div>
 
@@ -159,7 +165,7 @@ export default function MerchantReportsPage() {
         <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
           <h3 className="text-sm font-black text-navy-900 flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-brand-blue" />
-            Daily Sales Breakdown
+            Daily Synced Record Breakdown
           </h3>
           <div className="flex items-end gap-2 h-28">
             {dailyEntries.map(([day, amount]) => {
@@ -182,13 +188,13 @@ export default function MerchantReportsPage() {
 
       {/* Channel Breakdown */}
       <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-5">
-        <h3 className="text-sm font-black text-navy-900">Payment Channel Breakdown</h3>
+        <h3 className="text-sm font-black text-navy-900">Synced Record Type Breakdown</h3>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
             <div className="flex justify-between text-xs font-bold text-navy-900">
               <span>Itemized Bill QR ({billQrPercent.toFixed(1)}%)</span>
-              <span>₹{billQrRevenue.toFixed(2)}</span>
+              <span>₹{billQrAmount.toFixed(2)}</span>
             </div>
             <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
               <div
@@ -201,7 +207,7 @@ export default function MerchantReportsPage() {
           <div className="space-y-1.5">
             <div className="flex justify-between text-xs font-bold text-navy-900">
               <span>Static Merchant QR ({staticQrPercent.toFixed(1)}%)</span>
-              <span>₹{staticQrRevenue.toFixed(2)}</span>
+              <span>₹{staticQrAmount.toFixed(2)}</span>
             </div>
             <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
               <div
@@ -217,7 +223,7 @@ export default function MerchantReportsPage() {
       {filtered.length > 0 && (
         <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-black text-navy-900">Recent Orders</h3>
+            <h3 className="text-sm font-black text-navy-900">Recent Transaction Records</h3>
             <a href="/merchant/transactions" className="text-xs font-bold text-brand-blue hover:underline flex items-center gap-1">
               View All <ArrowRight className="w-3.5 h-3.5" />
             </a>
@@ -247,14 +253,14 @@ export default function MerchantReportsPage() {
       {pendingCount > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-bold text-amber-900">{pendingCount} transaction{pendingCount > 1 ? 's' : ''} pending sync</p>
-            <p className="text-[11px] text-amber-700">These will sync automatically when internet is available.</p>
+            <p className="text-xs font-bold text-amber-900">{pendingCount} pending transaction record{pendingCount > 1 ? 's' : ''}</p>
+            <p className="text-[11px] text-amber-700">Customer-submitted records remain unverified until checked outside NoPay.</p>
           </div>
           <a
-            href="/merchant/sync"
+            href="/merchant/transactions"
             className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shrink-0 transition-all"
           >
-            Sync Now
+            Review Records
           </a>
         </div>
       )}
@@ -262,8 +268,8 @@ export default function MerchantReportsPage() {
       {!loading && filtered.length === 0 && (
         <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center shadow-sm space-y-2">
           <BarChart3 className="w-10 h-10 text-slate-300 mx-auto" />
-          <p className="text-sm font-bold text-slate-500">No sales data for this period</p>
-          <p className="text-xs text-slate-400">Complete some bills or payments to see your analytics here.</p>
+          <p className="text-sm font-bold text-slate-500">No transaction records for this period</p>
+          <p className="text-xs text-slate-400">Create records or sync offline transactions to see them here.</p>
         </div>
       )}
     </div>

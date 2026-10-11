@@ -115,8 +115,8 @@ export default function MerchantPosBillingPage() {
         }
         showSnackbar({
           type: detail.isOffline ? 'pending' : 'success',
-          title: detail.isOffline ? 'Bill Payment Scanned (Pending Sync)' : 'Bill Payment Confirmed',
-          description: `₹${detail.transaction.amount.toFixed(2)} received for ${detail.transaction.billId || 'Bill'} [${detail.transaction.status}]`,
+          title: detail.isOffline ? 'Offline Bill Record Added' : 'Bill Record Synced',
+          description: `₹${detail.transaction.amount.toFixed(2)} recorded for ${detail.transaction.billId || 'Bill'} [${detail.transaction.status}]. NoPay has not verified a money transfer.`,
           durationMs: 5000,
         });
       }
@@ -593,12 +593,12 @@ export default function MerchantPosBillingPage() {
                 {billPaymentStatus === 'CONFIRMED' || billPaymentStatus === 'SYNCED' ? (
                   <>
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>Customer Paid & Confirmed Online!</span>
+                    <span>Bill record saved to NoPay ledger</span>
                   </>
                 ) : (
                   <>
                     <Clock className="w-4 h-4 text-amber-600 animate-pulse" />
-                    <span>Customer Scanned Offline: Queued (Pending Sync)</span>
+                    <span>Offline bill record pending sync</span>
                   </>
                 )}
               </div>
@@ -641,4 +641,3 @@ export default function MerchantPosBillingPage() {
     </div>
   );
 }
-

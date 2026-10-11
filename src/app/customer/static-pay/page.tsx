@@ -19,8 +19,6 @@ export default function CustomerStaticPayPage() {
   const [merchant, setMerchant] = useState<{
     merchantId: string;
     merchantName: string;
-    external?: boolean;
-    scheme?: string;
   } | null>(null);
   const [amount, setAmount] = useState<string>('');
   const [note, setNote] = useState<string>('');
@@ -29,23 +27,15 @@ export default function CustomerStaticPayPage() {
 
   useEffect(() => {
     const result = readScannedQr();
-    if (!result || (result.type !== 'MERCHANT' && result.type !== 'EXTERNAL')) {
-      setError('QR code not recognized. Please scan a valid payment QR.');
+    if (!result || result.type !== 'MERCHANT') {
+      setError('Only a valid NoPay merchant QR can be used here.');
       return;
     }
 
-    if (result.type === 'EXTERNAL') {
-      setMerchant({
-        merchantId: `EXTERNAL-${result.scheme}`,
-        merchantName: result.merchantName,
-        external: true,
-        scheme: result.scheme,
-      });
-      if (result.presetAmount) setAmount(result.presetAmount.toFixed(2));
-      return;
-    }
-
-    setMerchant({ merchantId: result.merchantId, merchantName: 'Merchant' });
+    setMerchant({
+      merchantId: result.merchantId,
+      merchantName: result.merchantName || 'Merchant',
+    });
 
     if (typeof navigator !== 'undefined' && navigator.onLine) {
       fetch(`/api/merchants/${encodeURIComponent(result.merchantId)}`)
@@ -81,33 +71,6 @@ export default function CustomerStaticPayPage() {
 
     setLoading(true);
     setError(null);
-
-    // External bank/UPI QRs are UI-only until the payment backend is wired.
-    if (merchant.external) {
-      const transactionId = `UI-TXN-${Date.now()}`;
-      sessionStorage.setItem(
-        'nopay_last_txn',
-        JSON.stringify({
-          transactionId,
-          merchantId: merchant.merchantId,
-          merchantName: merchant.merchantName,
-          customerName: 'Customer',
-          amount: numAmount,
-          type: 'STATIC_QR',
-          status: 'CONFIRMED',
-          idempotencyKey: crypto.randomUUID(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        })
-      );
-      showSnackbar({
-        type: 'success',
-        title: 'Payment Confirmed',
-        description: `Paid ₹${numAmount.toFixed(2)} to ${merchant.merchantName}`,
-      });
-      router.push('/customer/payment?status=confirmed');
-      return;
-    }
 
     const txnId = `TXN-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
     const idempotencyKey = crypto.randomUUID();
@@ -160,10 +123,10 @@ export default function CustomerStaticPayPage() {
           sessionStorage.setItem('nopay_last_txn', JSON.stringify(confirmedTxn));
           showSnackbar({
             type: 'success',
-            title: 'Payment Confirmed Online',
-            description: `Paid ₹${numAmount.toFixed(2)} to ${merchant.merchantName}. Both you and the merchant have record of this.`,
+            title: 'Payment Record Synced',
+            description: `The ₹${numAmount.toFixed(2)} record was saved to the NoPay ledger. NoPay does not transfer or verify money.`,
           });
-          router.push('/customer/payment?status=confirmed');
+          window.location.assign('/customer/payment?status=confirmed');
           return;
         }
         if (res.status >= 400 && res.status < 500 && res.status !== 401) {
@@ -187,11 +150,11 @@ export default function CustomerStaticPayPage() {
       sessionStorage.setItem('nopay_last_txn', JSON.stringify(newTxn));
       showSnackbar({
         type: 'pending',
-        title: 'Offline Payment Queued',
-        description: `₹${numAmount.toFixed(2)} queued offline. Instantly visible on both your device and the merchant's screen as Pending Sync.`,
+        title: 'Offline Record Saved',
+        description: `₹${numAmount.toFixed(2)} saved on this device. Show the transaction QR to the merchant to save an independent pending copy.`,
         durationMs: 5500,
       });
-      router.push('/customer/payment?status=queued');
+      window.location.assign('/customer/payment?status=queued');
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : 'Failed to save transaction';
       setError(errMsg);
@@ -233,9 +196,10 @@ export default function CustomerStaticPayPage() {
             </div>
             <div>
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                {merchant.external ? `${merchant.scheme} payment QR` : 'Paying To'}
+                Paying To
               </span>
               <h3 className="text-lg font-black text-navy-900 leading-snug">{merchant.merchantName}</h3>
+              <p className="text-[10px] font-mono text-slate-500">Merchant ID: {merchant.merchantId}</p>
             </div>
           </div>
 
@@ -248,7 +212,7 @@ export default function CustomerStaticPayPage() {
           {!isOnline && (
             <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-semibold">
               <WifiOff className="w-4 h-4 shrink-0 text-amber-600" />
-              <span>You&apos;re offline. Your payment will be stored safely and display immediately on both customer and merchant screens.</span>
+              <span>NoPay cannot verify this merchant while offline. Confirm the Merchant ID with the shop. This creates only a pending record, not a payment; show its QR to the merchant for a separate copy.</span>
             </div>
           )}
 
@@ -304,7 +268,7 @@ export default function CustomerStaticPayPage() {
               ) : (
                 <>
                   <CreditCard className="w-5 h-5" />
-                  <span>Pay ₹{amount || '0.00'}</span>
+                  <span>Create Record for ₹{amount || '0.00'}</span>
                 </>
               )}
             </button>
@@ -312,7 +276,7 @@ export default function CustomerStaticPayPage() {
 
           <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 font-semibold pt-2">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Dual-Sided Transparent Offline Verification</span>
+            <span>Offline Record Handoff by QR</span>
           </div>
         </div>
       ) : null}

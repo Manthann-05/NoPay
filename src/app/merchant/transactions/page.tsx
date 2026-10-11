@@ -1,12 +1,17 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getOfflineTransactions } from '@/offline/queue';
+import { offlineDb } from '@/offline/db';
 import { subscribeToTransactionEvents } from '@/offline/liveChannel';
 import { Transaction } from '@/types';
 import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
 import { useSnackbar } from '@/components/shared/SnackbarProvider';
-import { FileText, Clock, CheckCircle2, Search, RefreshCw, X, ArrowUpRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { FileText, Clock, CheckCircle2, Search, RefreshCw, X, ArrowUpRight, ShieldCheck, AlertCircle, QrCode } from 'lucide-react';
+import { QrScannerModal } from '@/components/qr/QrScannerModal';
+import { ScannedQrResult } from '@/lib/qr/payload';
+import { getLocalSession } from '@/offline/session';
+import { recordReceivedOfflineTransaction } from '@/offline/queue';
 
 export default function MerchantTransactionsPage() {
   const { showSnackbar } = useSnackbar();
@@ -15,11 +20,15 @@ export default function MerchantTransactionsPage() {
   const [filter, setFilter] = useState<'ALL' | 'BILL_QR' | 'STATIC_QR' | 'PENDING'>('ALL');
   const [search, setSearch] = useState<string>('');
   const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null);
+  const [merchantIds, setMerchantIds] = useState<string[]>([]);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const refreshInProgress = useRef(false);
 
   useEffect(() => {
     loadTransactions();
+    loadMerchantIds();
 
-    // Listen to real-time local cross-tab / cross-device transaction broadcast events
+    // Listen to transaction events from this window or another tab on this device.
     const unsubscribe = subscribeToTransactionEvents((detail) => {
       // Upsert transaction immediately in local state
       setTransactions((prev) => {
@@ -36,15 +45,15 @@ export default function MerchantTransactionsPage() {
       if (detail.action === 'CREATED') {
         showSnackbar({
           type: detail.isOffline ? 'pending' : 'success',
-          title: detail.isOffline ? 'New Offline Payment Detected' : 'New Online Payment Received',
-          description: `₹${detail.transaction.amount.toFixed(2)} (${detail.transaction.type}) - ${detail.transaction.transactionId} [${detail.transaction.status}]`,
+          title: detail.isOffline ? 'New Offline Record Received' : 'Transaction Record Created',
+          description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId}. NoPay has not verified a money transfer.`,
           durationMs: 5000,
         });
       } else if (detail.action === 'SYNCED') {
         showSnackbar({
           type: 'success',
-          title: 'Transaction Confirmed & Synced',
-          description: `₹${detail.transaction.amount.toFixed(2)} - ${detail.transaction.transactionId} is confirmed on server.`,
+          title: 'Transaction Record Synced',
+          description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId} is recorded in the NoPay ledger.`,
           durationMs: 4000,
         });
       }
@@ -55,20 +64,109 @@ export default function MerchantTransactionsPage() {
     };
   }, []);
 
-  const loadTransactions = async () => {
-    setLoading(true);
+  useEffect(() => {
+    const refreshWhenOnline = () => {
+      if (!document.hidden && navigator.onLine) void loadTransactions(false);
+    };
+    const interval = window.setInterval(refreshWhenOnline, 10000);
+    window.addEventListener('online', refreshWhenOnline);
+    document.addEventListener('visibilitychange', refreshWhenOnline);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('online', refreshWhenOnline);
+      document.removeEventListener('visibilitychange', refreshWhenOnline);
+    };
+  }, []);
+
+  const loadMerchantIds = async () => {
+    const ids = new Set<string>();
+    const localSession = await getLocalSession();
+    if (localSession?.merchantProfileId) ids.add(localSession.merchantProfileId);
+    if (localSession?.userId) ids.add(localSession.userId);
+
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user?.merchantProfileId) ids.add(data.user.merchantProfileId);
+          if (data.user?.userId) ids.add(data.user.userId);
+        }
+      } catch (err) {
+        console.warn('Could not refresh merchant identity:', err);
+      }
+    }
+
+    setMerchantIds(Array.from(ids));
+  };
+
+  const handleScannedQr = async (result: ScannedQrResult) => {
+    setScannerOpen(false);
+
+    if (result.type !== 'TRANSACTION') {
+      showSnackbar({
+        type: 'warning',
+        title: 'Not a payment record',
+        description: 'Scan the transaction QR shown on the customer’s pending payment screen.',
+      });
+      return;
+    }
+
+    if (merchantIds.length === 0) {
+      showSnackbar({
+        type: 'error',
+        title: 'Merchant identity unavailable',
+        description: 'Connect while online to verify your merchant profile before recording this QR.',
+      });
+      return;
+    }
+
+    if (!merchantIds.includes(result.transaction.merchantId)) {
+      showSnackbar({
+        type: 'error',
+        title: 'This record is for another merchant',
+        description: 'The transaction QR merchant ID does not match this merchant account.',
+      });
+      return;
+    }
+
+    try {
+      const inserted = await recordReceivedOfflineTransaction(result.transaction);
+      showSnackbar({
+        type: inserted ? 'pending' : 'info',
+        title: inserted ? 'Pending record saved on this device' : 'Record already saved',
+        description: inserted
+          ? `₹${result.transaction.amount.toFixed(2)} · ${result.transaction.transactionId}. This copied record is pending and does not verify that money was transferred.`
+          : `Transaction ${result.transaction.transactionId} is already in your local ledger.`,
+        durationMs: 6500,
+      });
+    } catch (err: unknown) {
+      showSnackbar({
+        type: 'error',
+        title: 'Could not save payment record',
+        description: err instanceof Error ? err.message : 'Please try scanning the customer QR again.',
+      });
+    }
+  };
+
+  const loadTransactions = async (showLoading = true) => {
+    if (refreshInProgress.current) return;
+    refreshInProgress.current = true;
+    if (showLoading) setLoading(true);
     try {
       const localTxns = await getOfflineTransactions();
       let serverTxns: Transaction[] = [];
 
-      try {
+      if (navigator.onLine) {
         const res = await fetch('/api/transactions');
         if (res.ok) {
           const data = await res.json();
           serverTxns = data.transactions || [];
+          if (serverTxns.length > 0) {
+            await offlineDb.transactions.bulkPut(serverTxns);
+          }
         }
-      } catch (err) {
-        console.warn('API fetch warning:', err);
       }
 
       const map = new Map<string, Transaction>();
@@ -82,9 +180,10 @@ export default function MerchantTransactionsPage() {
 
       setTransactions(merged);
     } catch (err) {
-      console.error(err);
+      console.warn('Could not refresh merchant transaction records:', err);
     } finally {
-      setLoading(false);
+      refreshInProgress.current = false;
+      if (showLoading) setLoading(false);
     }
   };
 
@@ -111,18 +210,27 @@ export default function MerchantTransactionsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-navy-900">Merchant Sales History</h1>
+          <h1 className="text-2xl font-black text-navy-900">Merchant Transaction Records</h1>
           <p className="text-xs text-slate-500">
-            Real-time dual-sided log of online, offline queued, and synced customer payments
+            Server-synced records refresh automatically and are cached on this device. A customer’s record cannot reach your device while both phones are offline.
           </p>
         </div>
-        <button
-          onClick={loadTransactions}
-          className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-colors"
-        >
-          <RefreshCw className="w-4 h-4" />
-          <span>Refresh Records</span>
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setScannerOpen(true)}
+            className="px-4 py-2 bg-brand-blue hover:bg-brand-darkBlue text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-colors"
+          >
+            <QrCode className="w-4 h-4" />
+            <span>Scan Customer QR</span>
+          </button>
+          <button
+            onClick={() => void loadTransactions()}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       {/* Controls */}
@@ -166,7 +274,7 @@ export default function MerchantTransactionsPage() {
       {/* Table */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="py-12 text-center text-xs font-bold text-slate-400">Loading sales records...</div>
+          <div className="py-12 text-center text-xs font-bold text-slate-400">Loading transaction records...</div>
         ) : filtered.length === 0 ? (
           <div className="py-12 text-center text-xs font-bold text-slate-400">No matching sales records.</div>
         ) : (
@@ -178,6 +286,7 @@ export default function MerchantTransactionsPage() {
                   <th className="p-4">Type</th>
                   <th className="p-4">Amount</th>
                   <th className="p-4">Sync Status</th>
+                  <th className="p-4">Payment Status</th>
                   <th className="p-4">Customer</th>
                   <th className="p-4">Date & Time</th>
                   <th className="p-4 text-right">Details</th>
@@ -186,7 +295,14 @@ export default function MerchantTransactionsPage() {
               <tbody className="divide-y divide-slate-100 font-medium text-navy-900">
                 {filtered.map((t) => (
                   <tr key={t.transactionId} className="hover:bg-slate-50/50">
-                    <td className="p-4 font-mono font-bold">{t.transactionId}</td>
+                    <td className="p-4 font-mono font-bold">
+                      {t.transactionId}
+                      {t.offlineReceived && (
+                        <span className="block font-sans text-[10px] font-semibold text-amber-700">
+                          Customer QR · saved on this device
+                        </span>
+                      )}
+                    </td>
                     <td className="p-4">
                       <span className="px-2.5 py-1 bg-slate-100 text-slate-700 font-extrabold text-[10px] rounded-md">
                         {t.type}
@@ -207,7 +323,38 @@ export default function MerchantTransactionsPage() {
                         <span>{transactionStatusLabel(t.status)}</span>
                       </span>
                     </td>
-                    <td className="p-4 text-slate-600 font-medium">{t.customerName || 'Customer'}</td>
+                    <td className="p-4 text-[10px] font-semibold">
+                      <span>
+                        {t.paymentStatus === 'PAID'
+                          ? 'Debit captured'
+                          : t.paymentStatus === 'AUTOPAY_SCHEDULED'
+                            ? 'AutoPay scheduled'
+                            : t.paymentStatus === 'FAILED'
+                              ? 'Debit failed'
+                              : 'Unverified'}
+                      </span>
+                      {t.autopayStatus && (
+                        <span className="mt-1 block text-slate-500">
+                          {t.autopayStatus === 'TRANSFER_PENDING'
+                            ? 'Merchant payout pending'
+                            : t.autopayStatus === 'TRANSFERRED'
+                              ? 'Transfer processed · bank settlement separate'
+                              : t.autopayStatus === 'TRANSFER_FAILED'
+                                ? 'Merchant payout failed'
+                                : t.autopayStatus === 'SCHEDULED'
+                                  ? `Debit scheduled${t.autopayPaymentAfter ? ` · ${new Date(t.autopayPaymentAfter).toLocaleString()}` : ''}`
+                                  : t.autopayStatus === 'CAPTURED'
+                                    ? 'Merchant payout processing'
+                                  : t.autopayStatus === 'FAILED'
+                                    ? 'Debit failed'
+                                    : t.autopayStatus.replaceAll('_', ' ')}
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-4 text-slate-600 font-medium">
+                      {t.customerName || 'Customer'}
+                      {t.offlineReceived && <span className="block text-[10px] text-amber-700">Name provided in QR</span>}
+                    </td>
                     <td className="p-4 text-slate-400 text-[11px] font-mono">
                       {new Date(t.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                     </td>
@@ -240,7 +387,7 @@ export default function MerchantTransactionsPage() {
 
             <div className="space-y-1">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                Transaction Receipt
+                Transaction Record
               </span>
               <h3 className="text-xl font-black text-navy-900">{selectedTxn.transactionId}</h3>
             </div>
@@ -256,6 +403,32 @@ export default function MerchantTransactionsPage() {
                   {transactionStatusLabel(selectedTxn.status)}
                 </span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400 font-semibold">Payment Status</span>
+                <span className="font-semibold">
+                  {selectedTxn.paymentStatus === 'PAID'
+                    ? 'Provider debit captured'
+                    : selectedTxn.paymentStatus === 'AUTOPAY_SCHEDULED'
+                      ? 'AutoPay debit scheduled'
+                      : selectedTxn.paymentStatus === 'FAILED'
+                        ? 'AutoPay debit failed'
+                        : 'Unverified'}
+                </span>
+              </div>
+              {selectedTxn.autopayStatus && (
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-semibold">Merchant Payout</span>
+                  <span className="font-semibold">
+                    {selectedTxn.autopayStatus === 'TRANSFERRED'
+                      ? 'Transfer processed; bank settlement is separate'
+                      : selectedTxn.autopayStatus === 'TRANSFER_PENDING'
+                        ? 'Pending'
+                        : selectedTxn.autopayStatus === 'TRANSFER_FAILED'
+                          ? 'Failed · support action required'
+                          : selectedTxn.autopayStatus.replaceAll('_', ' ')}
+                  </span>
+                </div>
+              )}
               {selectedTxn.billId && (
                 <div className="flex justify-between">
                   <span className="text-slate-400 font-semibold">Bill ID</span>
@@ -266,6 +439,11 @@ export default function MerchantTransactionsPage() {
                 <span className="text-slate-400 font-semibold">Customer</span>
                 <span className="font-semibold text-navy-900">{selectedTxn.customerName || 'Customer'}</span>
               </div>
+              {selectedTxn.offlineReceived && (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-[11px] text-amber-900">
+                  Copied from a customer-presented QR and saved on this device. The customer name and payment are not independently verified.
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-slate-400 font-semibold">Idempotency Key</span>
                 <span className="font-mono text-[10px] text-slate-600 truncate max-w-[180px]">
@@ -304,6 +482,16 @@ export default function MerchantTransactionsPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {scannerOpen && (
+        <QrScannerModal
+          onScanSuccess={(result) => {
+            void handleScannedQr(result);
+          }}
+          onClose={() => setScannerOpen(false)}
+          allowedTypes={['TRANSACTION']}
+        />
       )}
     </div>
   );

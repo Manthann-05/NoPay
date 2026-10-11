@@ -9,9 +9,9 @@ export function transactionStatusLabel(status: TransactionStatus | string): stri
     case 'SYNCING':
       return 'Syncing';
     case 'CONFIRMED':
-      return 'Transaction Confirmed';
+      return 'Recorded on Ledger';
     case 'SYNCED':
-      return 'Synced';
+      return 'Recorded on Ledger';
     case 'FAILED':
       return 'Failed';
     case 'REJECTED':

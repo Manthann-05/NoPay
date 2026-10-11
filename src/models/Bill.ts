@@ -18,7 +18,9 @@ export interface IBill extends Document {
   discount: number;
   tax: number;
   total: number;
-  status: 'CREATED' | 'PENDING' | 'PAID' | 'EXPIRED' | 'CANCELLED';
+  status: 'CREATED' | 'PENDING' | 'AUTOPAY_SCHEDULED' | 'PAYMENT_FAILED' | 'PAID' | 'EXPIRED' | 'CANCELLED';
+  autopayOrderId?: string;
+  paymentReference?: string;
   expiresAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -45,9 +47,11 @@ const BillSchema = new Schema<IBill>(
     total: { type: Number, required: true, min: 0 },
     status: {
       type: String,
-      enum: ['CREATED', 'PENDING', 'PAID', 'EXPIRED', 'CANCELLED'],
+      enum: ['CREATED', 'PENDING', 'AUTOPAY_SCHEDULED', 'PAYMENT_FAILED', 'PAID', 'EXPIRED', 'CANCELLED'],
       default: 'CREATED',
     },
+    autopayOrderId: { type: String, index: true },
+    paymentReference: { type: String },
     expiresAt: { type: Date },
   },
   { timestamps: true }

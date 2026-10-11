@@ -38,7 +38,7 @@ export default function CustomerTransactionsPage() {
         showSnackbar({
           type: 'success',
           title: 'Transaction Synchronized',
-          description: `₹${detail.transaction.amount.toFixed(2)} - ${detail.transaction.transactionId} is now verified on server.`,
+          description: `₹${detail.transaction.amount.toFixed(2)} - ${detail.transaction.transactionId} is recorded in NoPay; money transfer remains unverified.`,
         });
       }
     });
@@ -163,6 +163,21 @@ export default function CustomerTransactionsPage() {
                   </div>
                   <p className="text-[11px] text-slate-400 font-mono">
                     {new Date(t.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                  </p>
+                  <p className="mt-1 text-[11px] font-semibold text-slate-600">
+                    Payment: {t.paymentStatus === 'PAID'
+                      ? 'Provider debit captured'
+                      : t.paymentStatus === 'AUTOPAY_SCHEDULED'
+                        ? 'AutoPay debit scheduled'
+                        : t.paymentStatus === 'FAILED'
+                          ? 'AutoPay debit failed'
+                          : 'Not verified'}
+                    {t.autopayStatus === 'TRANSFER_PENDING' && ' · Merchant payout pending'}
+                    {t.autopayStatus === 'TRANSFERRED' && ' · Merchant transfer processed (bank settlement is separate)'}
+                    {t.autopayStatus === 'TRANSFER_FAILED' && ' · Merchant payout failed'}
+                    {t.autopayStatus === 'CAPTURED' && ' · Merchant payout processing'}
+                    {t.autopayStatus === 'SCHEDULED' && t.autopayPaymentAfter &&
+                      ` · Scheduled after ${new Date(t.autopayPaymentAfter).toLocaleString()}`}
                   </p>
                 </div>
               </div>

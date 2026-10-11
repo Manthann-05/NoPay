@@ -16,6 +16,7 @@ export interface ITransaction extends Document {
   status: 'LOCAL_CREATED' | 'PENDING_SYNC' | 'SYNCING' | 'CONFIRMED' | 'FAILED' | 'REJECTED';
   idempotencyKey: string;
   paymentReference?: string;
+  paymentStatus: 'UNVERIFIED' | 'PENDING' | 'AUTOPAY_SCHEDULED' | 'PAID' | 'FAILED';
   failureReason?: string;
   offlineCreated: boolean;
   syncedAt?: Date;
@@ -44,6 +45,12 @@ const TransactionSchema = new Schema<ITransaction>(
     },
     idempotencyKey: { type: String, required: true, unique: true, index: true },
     paymentReference: { type: String },
+    paymentStatus: {
+      type: String,
+      enum: ['UNVERIFIED', 'PENDING', 'AUTOPAY_SCHEDULED', 'PAID', 'FAILED'],
+      default: 'UNVERIFIED',
+      index: true,
+    },
     failureReason: { type: String },
     offlineCreated: { type: Boolean, default: false },
     syncedAt: { type: Date },

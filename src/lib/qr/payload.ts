@@ -16,7 +16,7 @@
  * - UPI PINs / CVVs
  */
 
-import { DecodedQrPayload, StaticMerchantQrPayload, BillQrPayload, BillItem } from '@/types';
+import { DecodedQrPayload, StaticMerchantQrPayload, BillQrPayload, BillItem, Transaction } from '@/types';
 
 const NOPAY_SCHEME = 'NOPAY://';
 const NOPAY_VERSION = 'v1';
@@ -35,13 +35,26 @@ interface CompactBillData {
   at: string;        // createdAt ISO string
 }
 
+interface CompactTransactionData {
+  txn: string;
+  m: string;
+  mn: string;
+  a: number;
+  t: Transaction['type'];
+  ik: string;
+  cn?: string;
+  b?: string;
+  at: string;
+}
+
 // ─── Public result types ─────────────────────────────────────────────────────
 
-export type NoPayQrType = 'MERCHANT' | 'BILL' | 'CUSTOMER';
+export type NoPayQrType = 'MERCHANT' | 'BILL' | 'CUSTOMER' | 'TRANSACTION';
 
 export interface NoPayMerchantQrResult {
   type: 'MERCHANT';
   merchantId: string;
+  merchantName?: string;
 }
 
 export interface NoPayCustomerQrResult {
@@ -65,41 +78,22 @@ export interface NoPayBillQrResult {
   expiresAt?: string;
 }
 
-export type NoPayQrResult = NoPayMerchantQrResult | NoPayBillQrResult | NoPayCustomerQrResult;
-
-export interface ExternalQrResult {
-  type: 'EXTERNAL';
-  raw: string;
-  scheme: string;
-  merchantName: string;
-  presetAmount?: number;
+export interface NoPayTransactionQrResult {
+  type: 'TRANSACTION';
+  transaction: Transaction;
 }
 
-export type ScannedQrResult = NoPayQrResult | ExternalQrResult;
+export type NoPayQrResult =
+  | NoPayMerchantQrResult
+  | NoPayBillQrResult
+  | NoPayCustomerQrResult
+  | NoPayTransactionQrResult;
 
-/** Accept standard UPI/bank QR payloads as a UI-only payment destination. */
+export type ScannedQrResult = NoPayQrResult;
+
+/** Only NoPay's versioned QR format is accepted by the in-app scanner. */
 export function parseScannedQr(raw: string): ScannedQrResult | null {
-  const noPayResult = parseNoPayQr(raw);
-  if (noPayResult) return noPayResult;
-
-  const value = raw.trim();
-  if (!value) return null;
-
-  let scheme = 'QR';
-  let merchantName = 'External payment QR';
-  let presetAmount: number | undefined;
-  try {
-    const url = new URL(value);
-    scheme = url.protocol.replace(':', '').toUpperCase() || scheme;
-    const name = url.searchParams.get('pn') || url.searchParams.get('name');
-    const amount = Number(url.searchParams.get('am'));
-    if (name) merchantName = name;
-    if (Number.isFinite(amount) && amount > 0) presetAmount = amount;
-  } catch {
-    // Bank QR payloads are not always URL-shaped; preserve the raw value.
-  }
-
-  return { type: 'EXTERNAL', raw: value, scheme, merchantName, presetAmount };
+  return parseNoPayQr(raw);
 }
 
 // ─── Base64url helpers ───────────────────────────────────────────────────────
@@ -173,9 +167,11 @@ export function parseNoPayQr(raw: string): NoPayQrResult | null {
 
     if (qrType === 'MERCHANT') {
       if (!id || id.trim() === '') return null;
+      const nameParam = parsed.searchParams.get('name');
       return {
         type: 'MERCHANT',
         merchantId: decodeURIComponent(id.trim()),
+        merchantName: nameParam?.trim() || undefined,
       } satisfies NoPayMerchantQrResult;
     }
 
@@ -187,6 +183,55 @@ export function parseNoPayQr(raw: string): NoPayQrResult | null {
         customerId: decodeURIComponent(id.trim()),
         customerName: nameParam ? decodeURIComponent(nameParam) : undefined,
       } satisfies NoPayCustomerQrResult;
+    }
+
+    if (qrType === 'TRANSACTION') {
+      if (!id || id.trim() === '') return null;
+      const dParam = parsed.searchParams.get('d');
+      if (!dParam) return null;
+
+      let compact: CompactTransactionData;
+      try {
+        compact = JSON.parse(fromBase64Url(dParam));
+      } catch {
+        return null;
+      }
+
+      if (
+        typeof compact.txn !== 'string' ||
+        compact.txn.trim() !== decodeURIComponent(id.trim()) ||
+        typeof compact.m !== 'string' ||
+        !compact.m.trim() ||
+        typeof compact.mn !== 'string' ||
+        !compact.mn.trim() ||
+        typeof compact.a !== 'number' ||
+        !Number.isFinite(compact.a) ||
+        compact.a <= 0 ||
+        !['STATIC_QR', 'BILL_QR'].includes(compact.t) ||
+        typeof compact.ik !== 'string' ||
+        !compact.ik.trim() ||
+        typeof compact.at !== 'string' ||
+        Number.isNaN(Date.parse(compact.at))
+      ) {
+        return null;
+      }
+
+      return {
+        type: 'TRANSACTION',
+        transaction: {
+          transactionId: compact.txn,
+          merchantId: compact.m,
+          merchantName: compact.mn,
+          customerName: typeof compact.cn === 'string' ? compact.cn : undefined,
+          billId: typeof compact.b === 'string' ? compact.b : undefined,
+          amount: compact.a,
+          type: compact.t,
+          status: 'PENDING_SYNC',
+          idempotencyKey: compact.ik,
+          offlineCreated: true,
+          createdAt: compact.at,
+        },
+      } satisfies NoPayTransactionQrResult;
     }
 
     if (qrType === 'BILL') {
@@ -255,11 +300,14 @@ export function parseNoPayQr(raw: string): NoPayQrResult | null {
 
 /**
  * Generate a Static Merchant QR string.
- * Format: NOPAY://v1/merchant/<merchantId>
+ * Format: NOPAY://v1/merchant/<merchantId>?name=<merchantName>
  */
-export function encodeStaticMerchantQr(merchantId: string): string {
+export function encodeStaticMerchantQr(merchantId: string, merchantName?: string): string {
   if (!merchantId) throw new Error('merchantId is required');
-  return `${NOPAY_SCHEME}${NOPAY_VERSION}/merchant/${encodeURIComponent(merchantId)}`;
+  const base = `${NOPAY_SCHEME}${NOPAY_VERSION}/merchant/${encodeURIComponent(merchantId)}`;
+  return merchantName?.trim()
+    ? `${base}?name=${encodeURIComponent(merchantName.trim())}`
+    : base;
 }
 
 /**
@@ -305,6 +353,26 @@ export function encodeBillQr(params: {
   return `${NOPAY_SCHEME}${NOPAY_VERSION}/bill/${encodeURIComponent(params.billId)}?d=${encoded}`;
 }
 
+export function encodeTransactionQr(transaction: Transaction): string {
+  if (!transaction.transactionId || !transaction.merchantId || !transaction.idempotencyKey) {
+    throw new Error('Transaction identity is required');
+  }
+
+  const compact: CompactTransactionData = {
+    txn: transaction.transactionId,
+    m: transaction.merchantId,
+    mn: transaction.merchantName,
+    a: transaction.amount,
+    t: transaction.type,
+    ik: transaction.idempotencyKey,
+    cn: transaction.customerName,
+    b: transaction.billId,
+    at: transaction.createdAt,
+  };
+
+  return `${NOPAY_SCHEME}${NOPAY_VERSION}/transaction/${encodeURIComponent(transaction.transactionId)}?d=${toBase64Url(JSON.stringify(compact))}`;
+}
+
 // ─── LEGACY COMPATIBILITY (deprecated — for internal migration use only) ─────
 
 /**
@@ -320,12 +388,12 @@ export function parseQrPayload(raw: string): DecodedQrPayload | null {
       type: 'MERCHANT',
       version: 1,
       merchantId: noPayResult.merchantId,
-      merchantName: '',
+      merchantName: noPayResult.merchantName || '',
     } as StaticMerchantQrPayload;
   }
 
-  // CUSTOMER QRs are not bill/merchant payloads — return null for legacy compat
-  if (noPayResult.type === 'CUSTOMER') return null;
+  // Customer and transaction QRs are not bill/merchant payloads.
+  if (noPayResult.type === 'CUSTOMER' || noPayResult.type === 'TRANSACTION') return null;
 
   return {
     type: 'BILL',
@@ -352,7 +420,8 @@ export function encodeStaticMerchantQrPayload(
   arg2?: string
 ): string {
   const merchantId = typeof arg1 === 'object' ? arg1.merchantId : arg1;
-  return encodeStaticMerchantQr(merchantId);
+  const merchantName = typeof arg1 === 'object' ? arg1.merchantName : arg2;
+  return encodeStaticMerchantQr(merchantId, merchantName);
 }
 
 /**

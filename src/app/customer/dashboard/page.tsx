@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { QrCode, History, RefreshCw, Smartphone, Store, ShieldCheck, ArrowRight, Zap, CheckCircle2, Clock } from 'lucide-react';
+import { QrCode, History, RefreshCw, Smartphone, Store, ShieldCheck, ArrowRight, Zap, CheckCircle2, Clock, CreditCard } from 'lucide-react';
 import { QrScannerModal } from '@/components/qr/QrScannerModal';
 import { getAllLocalTransactions } from '@/offline/queue';
 import { ScannedQrResult } from '@/lib/qr/payload';
@@ -62,12 +62,15 @@ export default function CustomerDashboardPage() {
 
   const handleQrDetected = (result: ScannedQrResult, rawText: string) => {
     setScannerOpen(false);
+
+    if (result.type === 'TRANSACTION') return;
+
     storeScannedQrRaw(rawText);
 
-    if (result.type === 'MERCHANT' || result.type === 'EXTERNAL' || result.type === 'CUSTOMER') {
-      router.push('/customer/static-pay');
-    } else {
-      router.push(`/customer/bill/${result.billId}`);
+    if (result.type === 'MERCHANT') {
+      window.location.assign('/customer/static-pay');
+    } else if (result.type === 'BILL') {
+      window.location.assign('/customer/bill');
     }
   };
 
@@ -114,6 +117,22 @@ export default function CustomerDashboardPage() {
           <span>Open Camera</span>
         </button>
       </div>
+
+      <Link
+        href="/customer/autopay"
+        className="flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-left transition-colors hover:border-brand-blue"
+      >
+        <span className="rounded-xl bg-white p-2 text-blue-700">
+          <CreditCard className="h-5 w-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-bold text-navy-900">Manage merchant AutoPay</span>
+          <span className="block text-xs text-slate-600">
+            Set per-merchant limits, review consent, or revoke a mandate
+          </span>
+        </span>
+        <ArrowRight className="h-4 w-4 shrink-0 text-blue-700" />
+      </Link>
 
       {/* Recent Activity List */}
       <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-card space-y-4">
@@ -189,6 +208,7 @@ export default function CustomerDashboardPage() {
         <QrScannerModal
           onScanSuccess={handleQrDetected}
           onClose={() => setScannerOpen(false)}
+          allowedTypes={['MERCHANT', 'BILL']}
         />
       )}
     </div>

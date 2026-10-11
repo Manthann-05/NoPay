@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getOfflineTransactions, getPendingSyncQueue } from '@/offline/queue';
+import { getOfflineTransactions } from '@/offline/queue';
 import { subscribeToTransactionEvents } from '@/offline/liveChannel';
 import { Transaction } from '@/types';
 import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
@@ -30,9 +30,9 @@ export default function MerchantDashboardPage() {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
   const [stats, setStats] = useState({
-    todayRevenue: 0,
-    totalSalesCount: 0,
-    pendingSyncCount: 0,
+    recordedAmount: 0,
+    totalRecordCount: 0,
+    pendingRecordCount: 0,
     activeProductsCount: 0,
   });
   const [recentTxns, setRecentTxns] = useState<Transaction[]>([]);
@@ -47,8 +47,8 @@ export default function MerchantDashboardPage() {
       if (detail.action === 'CREATED') {
         showSnackbar({
           type: detail.isOffline ? 'pending' : 'success',
-          title: detail.isOffline ? 'New Offline Payment Detected' : 'New Online Payment Received',
-          description: `₹${detail.transaction.amount.toFixed(2)} (${detail.transaction.type}) - ${detail.transaction.transactionId} [${detail.transaction.status}]`,
+          title: detail.isOffline ? 'New Offline Record Received' : 'Transaction Record Created',
+          description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId}. NoPay has not verified a money transfer.`,
           durationMs: 5000,
         });
       }
@@ -64,7 +64,6 @@ export default function MerchantDashboardPage() {
     try {
       // 1. Load local Dexie data first (completely offline)
       const { offlineDb } = await import('@/offline/db');
-      const pendingQueue = await getPendingSyncQueue();
       const localTxns = await getOfflineTransactions();
       let productsCount = await offlineDb.products.count();
 
@@ -98,12 +97,19 @@ export default function MerchantDashboardPage() {
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
 
-      const totalRevenue = merged.reduce((sum, t) => sum + t.amount, 0);
+      const ledgerRecords = merged.filter((t) => t.status === 'CONFIRMED' || t.status === 'SYNCED');
+      const recordedAmount = ledgerRecords.reduce((sum, t) => sum + t.amount, 0);
+      const pendingRecordCount = merged.filter((t) =>
+        t.status === 'LOCAL_CREATED' ||
+        t.status === 'PENDING_SYNC' ||
+        t.status === 'SYNCING' ||
+        t.status === 'RETRY_PENDING'
+      ).length;
 
       setStats({
-        todayRevenue: totalRevenue,
-        totalSalesCount: merged.length,
-        pendingSyncCount: pendingQueue.length,
+        recordedAmount,
+        totalRecordCount: merged.length,
+        pendingRecordCount,
         activeProductsCount: productsCount,
       });
 
@@ -125,7 +131,7 @@ export default function MerchantDashboardPage() {
           </span>
           <h1 className="text-2xl sm:text-3xl font-black text-white">Merchant Dashboard</h1>
           <p className="text-xs text-slate-300 max-w-xl">
-            Offline-First Billing System. Create itemized QR bills, accept instant QR payments, and maintain complete dual-sided transaction visibility.
+            Create bills and exchange pending transaction records offline. Records are not payment settlement or proof that funds were received.
           </p>
         </div>
 
@@ -151,36 +157,36 @@ export default function MerchantDashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="bg-white p-5 lg:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
           <div className="flex justify-between items-center text-slate-400">
-            <span className="text-xs font-extrabold uppercase tracking-wider">Total Sales</span>
+            <span className="text-xs font-extrabold uppercase tracking-wider">Ledger Record Amount</span>
             <TrendingUp className="w-5 h-5 text-emerald-500" />
           </div>
-          <p className="text-3xl font-black text-navy-900">₹{stats.todayRevenue.toFixed(2)}</p>
-          <p className="text-[11px] text-slate-500 font-medium">Combined online & offline revenue</p>
+          <p className="text-3xl font-black text-navy-900">₹{stats.recordedAmount.toFixed(2)}</p>
+          <p className="text-[11px] text-slate-500 font-medium">Synced records, not verified settlement</p>
         </div>
 
         <div className="bg-white p-5 lg:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
           <div className="flex justify-between items-center text-slate-400">
-            <span className="text-xs font-extrabold uppercase tracking-wider">Total Transactions</span>
+            <span className="text-xs font-extrabold uppercase tracking-wider">Transaction Records</span>
             <FileText className="w-5 h-5 text-brand-blue" />
           </div>
-          <p className="text-3xl font-black text-navy-900">{stats.totalSalesCount}</p>
-          <p className="text-[11px] text-slate-500 font-medium">Processed order count</p>
+          <p className="text-3xl font-black text-navy-900">{stats.totalRecordCount}</p>
+          <p className="text-[11px] text-slate-500 font-medium">Includes offline pending records</p>
         </div>
 
         <div className="bg-white p-5 lg:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
           <div className="flex justify-between items-center text-slate-400">
-            <span className="text-xs font-extrabold uppercase tracking-wider">Offline Queued</span>
+            <span className="text-xs font-extrabold uppercase tracking-wider">Pending Records</span>
             <Clock className="w-5 h-5 text-amber-500" />
           </div>
           <div className="flex items-center gap-2">
-            <p className="text-3xl font-black text-navy-900">{stats.pendingSyncCount}</p>
-            {stats.pendingSyncCount > 0 && (
+            <p className="text-3xl font-black text-navy-900">{stats.pendingRecordCount}</p>
+            {stats.pendingRecordCount > 0 && (
               <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">
-                Pending Sync
+                Not verified
               </span>
             )}
           </div>
-          <p className="text-[11px] text-slate-500 font-medium">Awaiting auto server sync</p>
+          <p className="text-[11px] text-slate-500 font-medium">Some may be customer-submitted copies</p>
         </div>
 
         <div className="bg-white p-5 lg:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
@@ -222,16 +228,16 @@ export default function MerchantDashboardPage() {
         </Link>
 
         <Link
-          href="/merchant/sync"
+          href="/merchant/transactions"
           className="bg-amber-50/70 border border-amber-200 p-5 rounded-2xl hover:border-amber-400 hover:shadow-md transition-all group space-y-2 min-w-0"
         >
           <div className="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center font-bold">
             <Zap className="w-5 h-5" />
           </div>
           <h3 className="text-base font-black text-navy-900 group-hover:text-amber-600 transition-colors">
-            Sync Center ({stats.pendingSyncCount})
+            Pending Records ({stats.pendingRecordCount})
           </h3>
-          <p className="text-xs text-slate-500">Review pending transactions and sync now</p>
+          <p className="text-xs text-slate-500">Review records and scan customer transaction QR codes</p>
         </Link>
 
         <Link
@@ -242,7 +248,7 @@ export default function MerchantDashboardPage() {
             <BarChart3 className="w-5 h-5" />
           </div>
           <h3 className="text-base font-black text-navy-900 group-hover:text-emerald-600 transition-colors">
-            Sales Reports
+            Transaction Reports
           </h3>
           <p className="text-xs text-slate-500">Analytics charts & payment distribution</p>
         </Link>
@@ -253,7 +259,7 @@ export default function MerchantDashboardPage() {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-black text-navy-900">Recent Transactions</h3>
-            <p className="text-xs text-slate-400">Latest sales across static & bill QR payments</p>
+            <p className="text-xs text-slate-400">Latest transaction records; pending entries are not verified payments</p>
           </div>
           <Link
             href="/merchant/transactions"

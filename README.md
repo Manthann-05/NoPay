@@ -10,9 +10,21 @@ NoPay is a production-grade, genuine **Offline-First Progressive Web Application
 > 
 > Instead, NoPay provides:
 > 1. **Offline Bill Generation & Itemized Cart**: Merchants can create bills and calculate totals entirely on-device without internet.
-> 2. **Offline-Capable QR Codes**: Static merchant and itemized bill QR codes contain self-contained payloads readable by any camera scanner offline.
-> 3. **Cryptographic Idempotent Offline Queue**: Customer payment intents are saved to browser IndexedDB with unique UUID idempotency keys and timestamps.
+> 2. **Offline-Capable NoPay QR Codes**: Static merchant and itemized bill QR codes contain self-contained payloads readable by the NoPay scanner offline. Merchant IDs and QR-provided names are shown for identification, but cannot be server-verified while offline. In-app scanning accepts only versioned NoPay QR payloads; external bank/UPI QR codes are rejected.
+> 3. **Offline Transaction Records**: Customer payment intents are saved to browser IndexedDB with unique UUID idempotency keys and timestamps. Customers can show a transaction QR so the merchant can store an independent pending copy on the merchant device.
 > 4. **Deferred Auto-Sync**: When internet connectivity returns, transactions are sent in order to the central ledger with automatic retries, backoff, and duplicate rejection.
+>
+> A transaction QR is a customer-presented record, not proof that cash or bank funds were transferred. NoPay does not verify or settle offline payments.
+>
+> **Optional AutoPay recovery:** When enabled and available on the NoPay Razorpay account, a customer may authorize a separate UPI mandate for a specific merchant with a maximum debit amount. After an eligible, server-stored merchant bill is matched to that customer, NoPay can request a debit with Razorpay's required pre-debit notice (typically at least 24 hours). Syncing an offline record alone never proves payment or authorizes a debit. A captured payment and its merchant transfer have separate states; a captured debit does not mean the merchant's bank settlement is complete.
+
+### AutoPay and merchant payout prerequisites
+
+AutoPay is disabled unless both `RAZORPAY_AUTOPAY_ENABLED` and `RAZORPAY_ROUTE_ENABLED` are set to `true`. Razorpay must enable UPI recurring payments and Route for the NoPay account, and the merchant must finish Route onboarding and verification. Eligibility and activation depend on Razorpay account approval; the feature is not a substitute for offline payment verification.
+
+For each eligible bill, NoPay requests a debit up to the customer-approved mandate cap. The debit is not immediate on sync: the customer receives the provider's pre-debit notice before the scheduled collection. Only a signed Razorpay capture webhook marks the bill paid. NoPay then creates an idempotent Route direct transfer for the bill's full amount. This makes NoPay responsible for provider fees and requires sufficient available NoPay account balance to fund both payouts and applicable fees; a payout can remain pending or fail even after the customer debit is captured. Customers can revoke a mandate, and merchant-issued bills are the only eligible records—customer-created offline/static-QR records are excluded.
+
+Set `RAZORPAY_WEBHOOK_SECRET` to the secret configured for the Razorpay webhook endpoint `/api/payments/webhook`. Subscribe it to the payment, token, transfer, and Route account events handled by the endpoint. Keep both feature flags off until the provider features, webhook configuration, and merchant payout flow have been tested with the Razorpay account.
 
 ---
 
@@ -55,14 +67,14 @@ NoPay is a production-grade, genuine **Offline-First Progressive Web Application
 ### Core Offline Components
 
 1. **Service Worker (`public/sw.js`)**:
-   - Implements a cache versioned strategy (`nopay-cache-v2`, `nopay-dynamic-v2`).
+   - Implements a cache versioned strategy (`nopay-cache-v4`, `nopay-dynamic-v4`).
    - App shell navigation requests are served with a fast **Cache-First / Stale-While-Revalidate** strategy, with automatic fallback to `/` when offline.
-   - Next.js static assets (`/_next/static/*`) and media files are cached on retrieval.
+   - Next.js static assets (`/_next/static/*`) and media files are cached on retrieval; authenticated route caching also follows referenced lazy chunks needed for offline checkout.
    - API endpoints (`/api/*`) bypass the service worker to prevent stale mutations.
 
 2. **IndexedDB Schema via Dexie.js (`src/offline/db.ts`)**:
    - `localSession`: Caches user identity, roles, active role, and merchant profile offline (no tokens or passwords).
-   - `transactions`: Local transaction ledger for both customer and merchant history.
+   - `transactions`: Local transaction records. Each device keeps its own copy; a customer can transfer a pending record to the merchant by showing its transaction QR.
    - `syncQueue`: Offline sync queue storing items with state (`PENDING_SYNC`, `RETRY_PENDING`, `SYNCED`, `REJECTED`), attempt counts, backoff timings, and idempotency keys.
    - `bills`: Local store for itemized bills generated offline by the merchant.
    - `products`: Cached product catalog for offline POS search, stock display, and barcode lookups.
@@ -90,7 +102,7 @@ NoPay is a production-grade, genuine **Offline-First Progressive Web Application
 |---|---|---|
 | `PENDING_SYNC` | Created offline or queued locally; waiting for initial sync attempt. | `SYNCING`, `RETRY_PENDING`, `CONFIRMED` |
 | `RETRY_PENDING` | Network failure during sync; scheduled for retry using exponential backoff. | `SYNCING`, `CONFIRMED`, `REJECTED` |
-| `CONFIRMED` / `SYNCED` | Successfully accepted and deduplicated by server MongoDB ledger. | Terminal State |
+| `CONFIRMED` / `SYNCED` | Successfully accepted and deduplicated by server MongoDB ledger; this is not proof of money transfer. | Terminal State |
 | `REJECTED` | Permanently rejected by server (e.g. invalid bill data, 4xx error). | Terminal State |
 
 ---
@@ -110,6 +122,7 @@ NoPay is a production-grade, genuine **Offline-First Progressive Web Application
 | Display Static Merchant QR | ✅ Local QR Generation | ✅ Online & Cached |
 | Camera QR Scanner | ✅ Local Canvas & Video API | ✅ Supported |
 | Record Payment Intent | ✅ Queued in IndexedDB | ✅ Direct API Sync |
+| Copy Pending Record to Merchant Device | ✅ Customer displays QR; merchant scans and saves locally | ✅ Same QR handoff is available |
 | View Past Transactions | ✅ IndexedDB History | ✅ Merged DB History |
 | Auto-Sync Queue | ⏸️ Paused (Safe in Dexie) | ⚡ Auto-Sync Triggered |
 
@@ -156,19 +169,20 @@ To test and verify the genuine offline experience:
      - Bill QR is generated locally on device canvas.
 2. In another window/tab (or same device):
    - Go to `/customer/scan` or enter `/customer/static-pay`:
-   - Enter an amount (e.g. ₹250) and submit.
-   - The transaction is recorded in IndexedDB with status `PENDING_SYNC` and queued in the sync engine.
-   - Check `/customer/transactions`: notice the transaction appears marked as `OFFLINE QUEUED`.
-   - The navigation badge updates to `1 Pending`.
+   - Enter an amount (e.g. ₹250) and submit. The transaction is recorded in customer IndexedDB with status `PENDING_SYNC`.
+   - Show the transaction QR on the result screen.
+   - On the merchant device, open `/merchant/transactions`, choose **Scan Customer QR**, and scan the displayed QR.
+   - The merchant ledger now has its own `PENDING_SYNC` copy. Both copies are local and pending; the QR does not verify payment.
+   - Check `/customer/transactions` and `/merchant/transactions` to confirm the record appears on each device.
 
 ### Step 4: Reconnect & Verify Automatic Synchronization
 1. In DevTools **Network** tab, uncheck **Offline** (restore internet connectivity).
 2. Observe:
    - Online status hook automatically detects the `online` event.
    - OfflineBadge changes to `Online` and triggers `processSyncQueue()`.
-   - The pending count decreases to 0.
-   - The transaction status transitions to `CONFIRMED`.
-   - MongoDB receives the transaction with zero duplicates thanks to the unique `idempotencyKey`.
+   - The pending count decreases to 0 on the device that queued the transaction.
+   - MongoDB records the transaction with zero duplicates thanks to the unique `idempotencyKey`.
+   - `CONFIRMED` means recorded in NoPay's server ledger, not confirmed payment settlement.
 
 ---
 

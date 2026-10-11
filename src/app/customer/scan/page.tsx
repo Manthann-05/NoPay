@@ -16,18 +16,14 @@ export default function CustomerScanPage() {
 
   const handleScanSuccess = (result: ScannedQrResult, rawText: string) => {
     try {
+      if (result.type !== 'MERCHANT' && result.type !== 'BILL') {
+        setScannerOpen(false);
+        return;
+      }
+
       storeScannedQrRaw(rawText);
       setScannerOpen(false);
-
-      // Replace the scanner route so the payment form is the next screen
-      // and a browser refresh cannot reopen the camera modal.
-      window.setTimeout(() => {
-        if (result.type === 'MERCHANT' || result.type === 'EXTERNAL' || result.type === 'CUSTOMER') {
-          router.replace('/customer/static-pay');
-        } else {
-          router.replace(`/customer/bill/${encodeURIComponent(result.billId)}`);
-        }
-      }, 0);
+      window.location.assign(result.type === 'MERCHANT' ? '/customer/static-pay' : '/customer/bill');
     } catch {
       setScannerOpen(false);
     }
@@ -64,6 +60,7 @@ export default function CustomerScanPage() {
         <QrScannerModal
           onScanSuccess={handleScanSuccess}
           onClose={() => setScannerOpen(false)}
+          allowedTypes={['MERCHANT', 'BILL']}
         />
       )}
     </div>

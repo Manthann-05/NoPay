@@ -66,8 +66,8 @@ export default function MerchantStaticQrPage() {
       if (detail.transaction.type === 'STATIC_QR') {
         showSnackbar({
           type: detail.isOffline ? 'pending' : 'success',
-          title: detail.isOffline ? 'Customer Scanned & Queued Payment!' : 'Customer Paid Online!',
-          description: `₹${detail.transaction.amount.toFixed(2)} received from ${detail.transaction.customerName || 'Customer'} [${detail.transaction.status}]`,
+          title: detail.isOffline ? 'Offline Transaction Record Added' : 'Transaction Record Synced',
+          description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId} [${detail.transaction.status}]. NoPay has not verified a money transfer.`,
           durationMs: 5000,
         });
       }
@@ -88,7 +88,7 @@ export default function MerchantStaticQrPage() {
       <div className="text-center space-y-2">
         <h1 className="text-2xl font-black text-navy-900">Permanent Merchant Static QR</h1>
         <p className="text-xs text-slate-500">
-          Display or print this QR poster for your counter. Any scanned customer payment (online or offline pending) shows up below and on your transactions ledger immediately.
+          Display or print this QR poster for your counter. For offline records, ask the customer to show their transaction QR and scan it from Merchant Transaction Records.
         </p>
       </div>
 
@@ -112,13 +112,13 @@ export default function MerchantStaticQrPage() {
         <div className="space-y-1">
           <p className="text-xs font-extrabold text-navy-900">Scan & Pay Any Amount</p>
           <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-            Transparently synchronizes and notifies both customer and merchant even in complete offline mode.
+            This identifies your shop. It does not transfer or verify payment. Offline transaction records must be handed to the merchant by QR.
           </p>
         </div>
 
         <div className="pt-4 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] text-slate-400 font-semibold">
           <ShieldCheck className="w-4 h-4 text-emerald-500" />
-          <span>NoPay End-to-End Idempotent Checkout</span>
+          <span>NoPay Merchant QR</span>
         </div>
       </div>
 
@@ -127,16 +127,16 @@ export default function MerchantStaticQrPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <History className="w-4 h-4 text-brand-blue" />
-            <h3 className="text-sm font-bold text-navy-900">Live Static QR Activity</h3>
+            <h3 className="text-sm font-bold text-navy-900">Local Static QR Records</h3>
           </div>
           <span className="text-[10px] bg-slate-100 font-bold text-slate-600 px-2 py-0.5 rounded-full">
-            Auto-Updated
+            This device
           </span>
         </div>
 
         {incomingTxns.length === 0 ? (
           <div className="p-4 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-            No payments scanned yet. Customer scans will appear here instantly.
+            No transaction records on this device yet.
           </div>
         ) : (
           <div className="divide-y divide-slate-100">

@@ -87,10 +87,21 @@ export interface Transaction {
   amount: number;
   type: TransactionType;
   status: TransactionStatus;
+  paymentStatus?: 'UNVERIFIED' | 'PENDING' | 'AUTOPAY_SCHEDULED' | 'PAID' | 'FAILED';
+  autopayStatus?:
+    | 'SCHEDULING'
+    | 'SCHEDULED'
+    | 'CAPTURED'
+    | 'FAILED'
+    | 'TRANSFER_PENDING'
+    | 'TRANSFERRED'
+    | 'TRANSFER_FAILED';
+  autopayPaymentAfter?: string;
   idempotencyKey: string;
   paymentReference?: string;
   failureReason?: string;
   offlineCreated?: boolean;
+  offlineReceived?: boolean;
   createdAt: string;
   updatedAt?: string;
   syncedAt?: string;
