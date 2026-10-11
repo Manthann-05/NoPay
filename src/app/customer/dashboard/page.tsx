@@ -64,7 +64,7 @@ export default function CustomerDashboardPage() {
     setScannerOpen(false);
     storeScannedQrRaw(rawText);
 
-    if (result.type === 'MERCHANT' || result.type === 'EXTERNAL') {
+    if (result.type === 'MERCHANT' || result.type === 'EXTERNAL' || result.type === 'CUSTOMER') {
       router.push('/customer/static-pay');
     } else {
       router.push(`/customer/bill/${result.billId}`);

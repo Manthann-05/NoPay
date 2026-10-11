@@ -5,6 +5,7 @@ import { User } from '@/models/User';
 import { MerchantProfile } from '@/models/MerchantProfile';
 import { EnableMerchantSchema } from '@/lib/validation/schemas';
 import { encodeStaticMerchantQr } from '@/lib/qr/payload';
+import { seedMerchantProducts } from '@/lib/db/merchantCatalogs';
 
 export async function POST(req: Request) {
   const session = await getSessionUser();
@@ -24,8 +25,10 @@ export async function POST(req: Request) {
     }
 
     let merchantProfile = await MerchantProfile.findOne({ userId: user._id });
+    let isNewMerchant = false;
 
     if (!merchantProfile) {
+      isNewMerchant = true;
       merchantProfile = await MerchantProfile.create({
         userId: user._id,
         shopName: validated.shopName,
@@ -44,6 +47,16 @@ export async function POST(req: Request) {
     user.activeRole = 'MERCHANT';
     user.merchantProfileId = merchantProfile._id;
     await user.save();
+
+    // Auto-seed a product catalog based on the shop name for new merchants
+    if (isNewMerchant) {
+      try {
+        await seedMerchantProducts(merchantProfile._id, validated.shopName);
+      } catch (seedErr) {
+        console.warn('Could not auto-seed merchant products:', seedErr);
+        // Non-fatal — merchant can add products manually
+      }
+    }
 
     const updatedSession = {
       userId: user._id.toString(),

@@ -2,9 +2,9 @@
 
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Download, Printer, Store, Receipt } from 'lucide-react';
+import { Download, Printer, Store, Receipt, User } from 'lucide-react';
 
-type QrType = 'MERCHANT' | 'BILL';
+type QrType = 'MERCHANT' | 'BILL' | 'CUSTOMER';
 
 interface QrCodeGeneratorProps {
   value: string;
@@ -61,6 +61,8 @@ export function QrCodeGenerator({
     ? { label: 'Merchant QR', Icon: Store, color: 'bg-blue-50 text-brand-blue' }
     : qrType === 'BILL'
     ? { label: 'Bill QR', Icon: Receipt, color: 'bg-emerald-50 text-emerald-700' }
+    : qrType === 'CUSTOMER'
+    ? { label: 'Customer QR', Icon: User, color: 'bg-purple-50 text-purple-700' }
     : null;
 
   return (

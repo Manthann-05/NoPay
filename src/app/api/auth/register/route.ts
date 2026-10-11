@@ -5,6 +5,7 @@ import { MerchantProfile } from '@/models/MerchantProfile';
 import { hashPassword, setSessionCookie } from '@/lib/auth/jwt';
 import { RegisterSchema } from '@/lib/validation/schemas';
 import { encodeStaticMerchantQr } from '@/lib/qr/payload';
+import { seedMerchantProducts } from '@/lib/db/merchantCatalogs';
 
 export async function POST(req: Request) {
   try {
@@ -51,6 +52,14 @@ export async function POST(req: Request) {
       merchantProfileId = merchantProfile._id.toString();
       newUser.merchantProfileId = merchantProfile._id;
       await newUser.save();
+
+      // Auto-seed product catalog based on shop name
+      try {
+        await seedMerchantProducts(merchantProfile._id, validated.shopName);
+      } catch (seedErr) {
+        console.warn('Could not auto-seed products on register:', seedErr);
+        // Non-fatal
+      }
     }
 
     const payload = {

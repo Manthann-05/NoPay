@@ -3,37 +3,78 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { RoleSwitcher } from '@/components/shared/RoleSwitcher';
-import { User, UserRole } from '@/types';
-import { clearLocalSession } from '@/offline/session';
+import { QrCodeGenerator } from '@/components/qr/QrCodeGenerator';
+import { encodeStaticCustomerQr } from '@/lib/qr/payload';
+import { getLocalSession, clearLocalSession } from '@/offline/session';
 import { notifyAuthStateChanged } from '@/lib/auth/client';
-import { User as UserIcon, Store, ArrowLeft, LogOut, ShieldCheck, Mail } from 'lucide-react';
+import { User as UserIcon, ArrowLeft, LogOut, ShieldCheck, Mail, QrCode } from 'lucide-react';
 
 // Force dynamic rendering to avoid pre-rendering issues with client-side hooks
 export const dynamic = 'force-dynamic';
 
 export default function CustomerProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<{
+    userId?: string;
+    name?: string;
+    email?: string;
+    roles?: ('CUSTOMER' | 'MERCHANT')[];
+    activeRole?: 'CUSTOMER' | 'MERCHANT';
+    merchantProfileId?: string;
+  } | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.user) {
-          setUser(data.user);
+    async function loadProfile() {
+      try {
+        // 1. Fallback to local offline session immediately
+        const session = await getLocalSession();
+        if (session) {
+          setUser({
+            userId: session.userId,
+            name: session.name,
+            email: session.email,
+            roles: session.roles,
+            activeRole: session.activeRole,
+            merchantProfileId: session.merchantProfileId,
+          });
+          setLoading(false);
         }
-      })
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false));
+
+        // 2. Fetch fresh profile from API if online
+        if (typeof navigator !== 'undefined' && navigator.onLine) {
+          const res = await fetch('/api/auth/me');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.user) {
+              setUser(data.user);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Error loading profile:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadProfile();
   }, []);
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // ignore
+    }
     await clearLocalSession();
     notifyAuthStateChanged();
     router.replace('/login');
   };
+
+  const customerId = user?.userId || 'CUST-DEMO';
+  const customerName = user?.name || 'Customer';
+  const customerQrPayload = encodeStaticCustomerQr(customerId, customerName);
 
   if (loading) {
     return (
@@ -45,23 +86,25 @@ export default function CustomerProfilePage() {
     <div className="max-w-md mx-auto py-6 px-4 space-y-6">
       <button
         onClick={() => router.push('/customer/dashboard')}
-        className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-navy-900"
+        className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-navy-900 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
         <span>Dashboard</span>
       </button>
 
+      {/* Profile Card */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-card p-6 space-y-6">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 bg-brand-blue text-white rounded-2xl flex items-center justify-center font-black text-xl shadow-md">
-            {user?.name?.charAt(0) || 'C'}
+            {customerName.charAt(0) || 'C'}
           </div>
           <div>
-            <h2 className="text-xl font-black text-navy-900">{user?.name || 'Customer Account'}</h2>
+            <h2 className="text-xl font-black text-navy-900">{customerName}</h2>
             <div className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
               <Mail className="w-3.5 h-3.5" />
               <span>{user?.email || 'customer@nopay.com'}</span>
             </div>
+            <p className="text-[11px] font-mono text-slate-400 mt-0.5">ID: {customerId}</p>
           </div>
         </div>
 
@@ -96,6 +139,37 @@ export default function CustomerProfilePage() {
           <LogOut className="w-4 h-4" />
           <span>Sign Out</span>
         </button>
+      </div>
+
+      {/* Customer Static QR Card */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-card p-6 space-y-4">
+        <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100">
+          <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
+            <QrCode className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-base font-black text-navy-900">Customer Static QR</h3>
+            <p className="text-xs text-slate-400">Personal customer identification & payment QR</p>
+          </div>
+        </div>
+
+        <div className="pt-2">
+          <QrCodeGenerator
+            value={customerQrPayload}
+            size={200}
+            qrType="CUSTOMER"
+            title={customerName}
+            subtitle={`Customer ID: ${customerId}`}
+            showActions={true}
+          />
+        </div>
+
+        <div className="p-3 bg-purple-50/70 border border-purple-100 rounded-2xl space-y-1 text-center">
+          <p className="text-xs font-bold text-purple-900">Permanent Personal QR</p>
+          <p className="text-[11px] text-purple-700 leading-relaxed">
+            Show this QR code to merchants or scan it to identify your customer wallet even without an internet connection.
+          </p>
+        </div>
       </div>
     </div>
   );
