@@ -17,7 +17,6 @@ import {
   QrCode,
   Scan,
   X,
-  Printer,
   PackageX,
   Clock,
   CheckCircle2,
@@ -565,7 +564,7 @@ export default function MerchantPosBillingPage() {
       {/* Bill QR Modal */}
       {qrModalOpen && (
         <div className="fixed inset-0 bg-navy-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full space-y-6 text-center relative shadow-2xl">
+          <div className="bg-white rounded-3xl p-5 max-w-xs w-full space-y-4 text-center relative shadow-2xl">
             <button
               onClick={() => setQrModalOpen(false)}
               className="absolute right-4 top-4 p-2 text-slate-400 hover:text-navy-900 rounded-full"
@@ -581,9 +580,13 @@ export default function MerchantPosBillingPage() {
               <p className="text-xs text-slate-500">Bill ID: {generatedBillId}</p>
             </div>
 
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 inline-block mx-auto">
-              <QrCodeGenerator value={qrPayload} size={220} qrType="BILL" />
-            </div>
+            <QrCodeGenerator
+              value={qrPayload}
+              size={180}
+              title=""
+              subtitle=""
+              showActions={false}
+            />
 
             {/* Live Customer Payment Status */}
             {billPaymentStatus ? (
@@ -606,12 +609,7 @@ export default function MerchantPosBillingPage() {
                   </>
                 )}
               </div>
-            ) : (
-              <div className="text-[11px] text-slate-400 font-medium flex items-center justify-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-slate-300" />
-                <span>Awaiting customer scan (Online & Offline supported)...</span>
-              </div>
-            )}
+            ) : null}
 
             <button
               type="button"
@@ -629,18 +627,13 @@ export default function MerchantPosBillingPage() {
 
             <div className="flex gap-2">
               <button
-                onClick={() => window.print()}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5"
-              >
-                <Printer className="w-4 h-4" />
-                <span>Print QR</span>
-              </button>
-              <button
                 onClick={() => {
                   setCart([]);
+                  setDiscount(0);
+                  setTaxPercent(0);
                   setQrModalOpen(false);
                 }}
-                className="flex-1 py-2.5 bg-navy-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800"
+                className="w-full py-2.5 bg-navy-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800"
               >
                 Done / Next Bill
               </button>

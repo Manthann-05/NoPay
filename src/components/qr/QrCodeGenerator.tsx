@@ -84,8 +84,8 @@ export function QrCodeGenerator({
         />
       </div>
 
-      <h3 className="text-lg font-bold text-navy-900 leading-snug">{title}</h3>
-      <p className="text-xs text-slate-500 mb-5">{subtitle}</p>
+      {title && <h3 className="text-lg font-bold text-navy-900 leading-snug">{title}</h3>}
+      {subtitle && <p className="text-xs text-slate-500 mb-5">{subtitle}</p>}
 
       {showActions && (
         <div className="flex items-center gap-2 w-full pt-3 border-t border-slate-100">
