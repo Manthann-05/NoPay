@@ -612,32 +612,17 @@ export default function MerchantPosBillingPage() {
             ) : null}
 
             <button
-              type="button"
               onClick={() => {
                 setCart([]);
                 setDiscount(0);
                 setTaxPercent(0);
+                setQrModalOpen(false);
                 setGeneratedBillCartCleared(true);
               }}
-              disabled={generatedBillCartCleared}
               className="w-full py-2.5 border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs font-bold rounded-xl hover:bg-emerald-100 disabled:cursor-default disabled:opacity-80"
             >
-              {generatedBillCartCleared ? 'Cart cleared for next customer' : 'Clear cart for next customer'}
+              Done Bill
             </button>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setCart([]);
-                  setDiscount(0);
-                  setTaxPercent(0);
-                  setQrModalOpen(false);
-                }}
-                className="w-full py-2.5 bg-navy-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800"
-              >
-                Done / Next Bill
-              </button>
-            </div>
           </div>
         </div>
       )}
