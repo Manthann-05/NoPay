@@ -49,6 +49,8 @@ export default function MerchantPosBillingPage() {
   const [qrModalOpen, setQrModalOpen] = useState<boolean>(false);
   const [qrPayload, setQrPayload] = useState<string>('');
   const [generatedBillId, setGeneratedBillId] = useState<string>('');
+  const [generatedBillTotal, setGeneratedBillTotal] = useState<number>(0);
+  const [generatedBillCartCleared, setGeneratedBillCartCleared] = useState<boolean>(false);
   const [billPaymentStatus, setBillPaymentStatus] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState<boolean>(false);
 
@@ -226,6 +228,8 @@ export default function MerchantPosBillingPage() {
     });
 
     setGeneratedBillId(billId);
+    setGeneratedBillTotal(grandTotal);
+    setGeneratedBillCartCleared(false);
     setBillPaymentStatus(null);
     setQrPayload(encoded);
     setQrModalOpen(true);
@@ -573,7 +577,7 @@ export default function MerchantPosBillingPage() {
               <span className="text-[10px] font-extrabold uppercase text-emerald-600 tracking-wider bg-emerald-50 px-3 py-1 rounded-full">
                 Bill QR Ready
               </span>
-              <h3 className="text-xl font-black text-navy-900">Scan to Pay ₹{grandTotal.toFixed(2)}</h3>
+              <h3 className="text-xl font-black text-navy-900">Scan to Pay ₹{generatedBillTotal.toFixed(2)}</h3>
               <p className="text-xs text-slate-500">Bill ID: {generatedBillId}</p>
             </div>
 
@@ -608,6 +612,20 @@ export default function MerchantPosBillingPage() {
                 <span>Awaiting customer scan (Online & Offline supported)...</span>
               </div>
             )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setCart([]);
+                setDiscount(0);
+                setTaxPercent(0);
+                setGeneratedBillCartCleared(true);
+              }}
+              disabled={generatedBillCartCleared}
+              className="w-full py-2.5 border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs font-bold rounded-xl hover:bg-emerald-100 disabled:cursor-default disabled:opacity-80"
+            >
+              {generatedBillCartCleared ? 'Cart cleared for next customer' : 'Clear cart for next customer'}
+            </button>
 
             <div className="flex gap-2">
               <button
