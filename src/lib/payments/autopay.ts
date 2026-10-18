@@ -32,8 +32,23 @@ export async function scheduleBillAutoPay(
   if (bill.status === 'PAID' || bill.status === 'CANCELLED' || bill.status === 'EXPIRED') {
     return { status: 'SKIPPED', reason: 'bill_not_outstanding' };
   }
+  if (
+    transaction.type !== 'BILL_QR' ||
+    transaction.deferredPaymentConsent !== true ||
+    !transaction.deferredPaymentConsentAt
+  ) {
+    return { status: 'SKIPPED', reason: 'customer_did_not_request_deferred_payment' };
+  }
   if (!transaction.customerId) {
     return { status: 'SKIPPED', reason: 'customer_not_identified' };
+  }
+  if (
+    !bill.customerId ||
+    String(bill.customerId) !== String(transaction.customerId) ||
+    bill.transactionId !== transaction.transactionId ||
+    Math.abs(Number(bill.total) - Number(transaction.amount)) >= 0.005
+  ) {
+    return { status: 'SKIPPED', reason: 'bill_transaction_mismatch' };
   }
 
   const [merchant, mandate] = await Promise.all([
@@ -85,6 +100,10 @@ export async function scheduleBillAutoPay(
       status: 'SCHEDULING',
       paymentAfter: new Date(Date.now() + 26 * 60 * 60 * 1000),
     });
+    await Transaction.updateOne(
+      { transactionId: transaction.transactionId, paymentStatus: { $ne: 'PAID' } },
+      { $set: { autopayStatus: 'SCHEDULING' } }
+    );
   } catch (err: unknown) {
     if (typeof err === 'object' && err !== null && 'code' in err && err.code === 11000) {
       return { status: 'SKIPPED', reason: 'attempt_already_exists' };
@@ -157,7 +176,13 @@ export async function scheduleBillAutoPay(
       );
       await Transaction.updateOne(
         { transactionId: transaction.transactionId, paymentStatus: { $ne: 'PAID' } },
-        { $set: { paymentStatus: 'AUTOPAY_SCHEDULED' } }
+        {
+          $set: {
+            paymentStatus: 'AUTOPAY_SCHEDULED',
+            autopayStatus: 'SCHEDULED',
+            autopayPaymentAfter: paymentAfter,
+          },
+        }
       );
     }
 
@@ -171,6 +196,10 @@ export async function scheduleBillAutoPay(
           failureReason: 'Razorpay could not schedule the debit.',
         },
       }
+    );
+    await Transaction.updateOne(
+      { transactionId: transaction.transactionId, paymentStatus: { $ne: 'PAID' } },
+      { $set: { autopayStatus: 'FAILED' } }
     );
     console.error('AutoPay scheduling failed for attempt:', String(attempt._id));
     return { status: 'SKIPPED', reason: 'provider_request_failed' };
@@ -205,7 +234,14 @@ export async function markAutoPayPaymentCaptured(
   await bill.save();
   await Transaction.updateOne(
     { transactionId: capturedAttempt.transactionId },
-    { $set: { paymentStatus: 'PAID', paymentReference: paymentId } }
+    {
+      $set: {
+        paymentStatus: 'PAID',
+        paymentReference: paymentId,
+        autopayStatus: 'CAPTURED',
+        autopayPaymentAfter: capturedAttempt.paymentAfter,
+      },
+    }
   );
 
   const merchant = await MerchantProfile.findById(capturedAttempt.merchantId).select(
@@ -228,6 +264,10 @@ export async function markAutoPayPaymentCaptured(
       const transfer = await razorpay.transfers.fetch(capturedAttempt.razorpayTransferId);
       capturedAttempt.status = transfer.status === 'processed' ? 'TRANSFERRED' : 'TRANSFER_PENDING';
       await capturedAttempt.save();
+      await Transaction.updateOne(
+        { transactionId: capturedAttempt.transactionId },
+        { $set: { autopayStatus: capturedAttempt.status } }
+      );
       return;
     }
     if (capturedAttempt.status === 'TRANSFER_FAILED') {
@@ -248,20 +288,29 @@ export async function markAutoPayPaymentCaptured(
       },
       String(capturedAttempt._id)
     );
+    const transferStatus = createdTransfer.status === 'processed' ? 'TRANSFERRED' : 'TRANSFER_PENDING';
     await AutoPayAttempt.updateOne(
       { _id: capturedAttempt._id, status: { $in: ['CAPTURED', 'TRANSFER_PENDING'] } },
       {
         $set: {
           razorpayTransferId: createdTransfer.id,
-          status: createdTransfer.status === 'processed' ? 'TRANSFERRED' : 'TRANSFER_PENDING',
+          status: transferStatus,
         },
         $unset: { failureReason: 1 },
       }
+    );
+    await Transaction.updateOne(
+      { transactionId: capturedAttempt.transactionId },
+      { $set: { autopayStatus: transferStatus } }
     );
   } catch (err: unknown) {
     capturedAttempt.status = 'TRANSFER_FAILED';
     capturedAttempt.failureReason = 'NoPay could not complete the merchant payout. Support action is required.';
     await capturedAttempt.save();
+    await Transaction.updateOne(
+      { transactionId: capturedAttempt.transactionId },
+      { $set: { autopayStatus: 'TRANSFER_FAILED' } }
+    );
     console.error('AutoPay merchant transfer failed for attempt:', String(capturedAttempt._id));
   }
 }
@@ -279,6 +328,6 @@ export async function markAutoPayPaymentFailed(attemptId: string, reason?: strin
   );
   await Transaction.updateOne(
     { transactionId: attempt.transactionId, paymentStatus: { $ne: 'PAID' } },
-    { $set: { paymentStatus: 'FAILED' } }
+    { $set: { paymentStatus: 'FAILED', autopayStatus: 'FAILED' } }
   );
 }

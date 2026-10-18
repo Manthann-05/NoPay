@@ -5,10 +5,13 @@ import { AutoPayAttempt } from '@/models/AutoPayAttempt';
 import { AutoPayMandate } from '@/models/AutoPayMandate';
 import { MerchantProfile } from '@/models/MerchantProfile';
 import { PaymentWebhookEvent } from '@/models/PaymentWebhookEvent';
+import { Bill } from '@/models/Bill';
+import { Transaction } from '@/models/Transaction';
 import {
   markAutoPayPaymentCaptured,
   markAutoPayPaymentFailed,
 } from '@/lib/payments/autopay';
+import { markTransactionPaymentCaptured } from '@/lib/payments/transactionPayment';
 import { getRazorpay } from '@/lib/payments/razorpay';
 
 interface RazorpayWebhook {
@@ -33,6 +36,15 @@ function getAttemptId(entity: Record<string, unknown>): string | null {
     return null;
   }
   const value = (notes as Record<string, unknown>).nopay_attempt_id;
+  return typeof value === 'string' ? value : null;
+}
+
+function getTransactionId(entity: Record<string, unknown>): string | null {
+  const notes = entity.notes;
+  if (typeof notes !== 'object' || notes === null || !('nopay_transaction_id' in notes)) {
+    return null;
+  }
+  const value = (notes as Record<string, unknown>).nopay_transaction_id;
   return typeof value === 'string' ? value : null;
 }
 
@@ -150,15 +162,47 @@ export async function POST(req: Request) {
             typeof payment.error_code === 'string' ? payment.error_code : undefined
           );
         }
-      } else if (
-        payment &&
-        payload.event === 'payment.failed' &&
-        typeof payment.order_id === 'string'
-      ) {
-        await AutoPayMandate.updateOne(
-          { razorpayOrderId: payment.order_id, status: 'PENDING' },
-          { $set: { status: 'FAILED' } }
-        );
+      } else if (payment) {
+        const transactionId = getTransactionId(payment);
+        if (transactionId && typeof payment.order_id === 'string') {
+          const transaction = await Transaction.findOne({ transactionId });
+          if (
+            !transaction ||
+            transaction.razorpayOrderId !== payment.order_id ||
+            Math.round(transaction.amount * 100) !== payment.amount
+          ) {
+            throw new Error('Razorpay payment did not match its NoPay transaction.');
+          }
+          if (payload.event === 'payment.captured') {
+            if (
+              typeof payment.id !== 'string' ||
+              payment.status !== 'captured' ||
+              payment.captured !== true
+            ) {
+              throw new Error('Razorpay capture event did not contain a captured payment.');
+            }
+            await markTransactionPaymentCaptured(transactionId, payment.id);
+            if (transaction.type === 'BILL_QR' && transaction.billId) {
+              await Bill.updateOne(
+                { billId: transaction.billId, status: { $ne: 'PAID' } },
+                { $set: { status: 'PAID', paymentReference: payment.id } }
+              );
+            }
+          } else {
+            await Transaction.updateOne(
+              { transactionId, paymentStatus: { $ne: 'PAID' } },
+              { $set: { paymentStatus: 'FAILED', failureReason: 'Razorpay reported a failed payment.' } }
+            );
+          }
+        } else if (
+          payload.event === 'payment.failed' &&
+          typeof payment.order_id === 'string'
+        ) {
+          await AutoPayMandate.updateOne(
+            { razorpayOrderId: payment.order_id, status: 'PENDING' },
+            { $set: { status: 'FAILED' } }
+          );
+        }
       }
     } else if (payload.event === 'transfer.processed' || payload.event === 'transfer.failed') {
       const transfer = payload.payload?.transfer?.entity;
@@ -177,6 +221,25 @@ export async function POST(req: Request) {
             attempt.failureReason = undefined;
           }
           await attempt.save();
+        } else {
+          const transactionId = getTransactionId(transfer);
+          if (transactionId) {
+            await Transaction.updateOne(
+              {
+                transactionId,
+                $or: [{ razorpayTransferId: { $exists: false } }, { razorpayTransferId: transfer.id }],
+              },
+              {
+                $set: {
+                  razorpayTransferId: transfer.id,
+                  payoutStatus: payload.event === 'transfer.processed' ? 'TRANSFERRED' : 'TRANSFER_FAILED',
+                  ...(payload.event === 'transfer.failed'
+                    ? { failureReason: 'Razorpay reported a failed merchant payout.' }
+                    : {}),
+                },
+              }
+            );
+          }
         }
       }
     } else if (

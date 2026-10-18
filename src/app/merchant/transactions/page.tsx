@@ -236,7 +236,7 @@ export default function MerchantTransactionsPage() {
                     <td className="p-4 text-[10px] font-semibold">
                       <span>
                         {t.paymentStatus === 'PAID'
-                          ? 'Debit captured'
+                          ? 'Provider payment captured'
                           : t.paymentStatus === 'AUTOPAY_SCHEDULED'
                             ? 'AutoPay scheduled'
                             : t.paymentStatus === 'FAILED'
@@ -258,6 +258,17 @@ export default function MerchantTransactionsPage() {
                                   : t.autopayStatus === 'FAILED'
                                     ? 'Debit failed'
                                     : t.autopayStatus.replaceAll('_', ' ')}
+                        </span>
+                      )}
+                      {t.payoutStatus && (
+                        <span className="mt-1 block text-slate-500">
+                          {t.payoutStatus === 'TRANSFERRED'
+                            ? 'Merchant transfer processed · bank settlement separate'
+                            : t.payoutStatus === 'TRANSFER_PENDING'
+                              ? 'Merchant transfer pending'
+                              : t.payoutStatus === 'TRANSFER_FAILED'
+                                ? 'Merchant transfer failed · review required'
+                                : 'Merchant transfer pending'}
                         </span>
                       )}
                     </td>

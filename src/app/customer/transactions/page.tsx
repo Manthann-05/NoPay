@@ -8,6 +8,7 @@ import { Transaction } from '@/types';
 import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
 import { useSnackbar } from '@/components/shared/SnackbarProvider';
 import { ArrowLeft, Clock, CheckCircle2, ShoppingBag, Search, WifiOff, RefreshCw } from 'lucide-react';
+import { CustomerTransactionPaymentAction } from '@/components/payments/CustomerTransactionPaymentAction';
 
 // Force dynamic rendering to avoid pre-rendering issues with client-side hooks
 export const dynamic = 'force-dynamic';
@@ -166,7 +167,7 @@ export default function CustomerTransactionsPage() {
                   </p>
                   <p className="mt-1 text-[11px] font-semibold text-slate-600">
                     Payment: {t.paymentStatus === 'PAID'
-                      ? 'Provider debit captured'
+                      ? 'Provider payment captured'
                       : t.paymentStatus === 'AUTOPAY_SCHEDULED'
                         ? 'AutoPay debit scheduled'
                         : t.paymentStatus === 'FAILED'
@@ -178,7 +179,29 @@ export default function CustomerTransactionsPage() {
                     {t.autopayStatus === 'CAPTURED' && ' · Merchant payout processing'}
                     {t.autopayStatus === 'SCHEDULED' && t.autopayPaymentAfter &&
                       ` · Scheduled after ${new Date(t.autopayPaymentAfter).toLocaleString()}`}
+                    {t.payoutStatus === 'TRANSFER_PENDING' && ' · Merchant payout pending'}
+                    {t.payoutStatus === 'TRANSFERRED' && ' · Merchant transfer processed (bank settlement is separate)'}
+                    {t.payoutStatus === 'TRANSFER_FAILED' && ' · Merchant payout needs review'}
                   </p>
+                  {(t.status === 'CONFIRMED' || t.status === 'SYNCED') &&
+                    t.paymentStatus !== 'PAID' &&
+                    t.paymentStatus !== 'AUTOPAY_SCHEDULED' &&
+                    t.autopayStatus !== 'SCHEDULING' &&
+                    t.autopayStatus !== 'SCHEDULED' && (
+                      <CustomerTransactionPaymentAction
+                        transactionId={t.transactionId}
+                        amount={t.amount}
+                        onPaid={(updated) => {
+                          setTransactions((current) =>
+                            current.map((transaction) =>
+                              transaction.transactionId === t.transactionId
+                                ? { ...transaction, ...updated }
+                                : transaction
+                            )
+                          );
+                        }}
+                      />
+                    )}
                 </div>
               </div>
 

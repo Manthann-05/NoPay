@@ -52,6 +52,7 @@ export async function GET() {
 
     return NextResponse.json({
       enabled: isRazorpayAutoPayEnabled() && isRazorpayRouteEnabled(),
+      customerId: String(session.userId),
       merchants: merchants.map((merchant) => ({
         merchantId: String(merchant._id),
         shopName: merchant.shopName,

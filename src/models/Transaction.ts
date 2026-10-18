@@ -16,7 +16,21 @@ export interface ITransaction extends Document {
   status: 'LOCAL_CREATED' | 'PENDING_SYNC' | 'SYNCING' | 'CONFIRMED' | 'FAILED' | 'REJECTED';
   idempotencyKey: string;
   paymentReference?: string;
+  razorpayOrderId?: string;
+  razorpayTransferId?: string;
+  payoutStatus?: 'PENDING' | 'TRANSFER_PENDING' | 'TRANSFERRED' | 'TRANSFER_FAILED';
   paymentStatus: 'UNVERIFIED' | 'PENDING' | 'AUTOPAY_SCHEDULED' | 'PAID' | 'FAILED';
+  deferredPaymentConsent: boolean;
+  deferredPaymentConsentAt?: Date;
+  autopayStatus?:
+    | 'SCHEDULING'
+    | 'SCHEDULED'
+    | 'CAPTURED'
+    | 'FAILED'
+    | 'TRANSFER_PENDING'
+    | 'TRANSFERRED'
+    | 'TRANSFER_FAILED';
+  autopayPaymentAfter?: Date;
   failureReason?: string;
   offlineCreated: boolean;
   syncedAt?: Date;
@@ -45,12 +59,33 @@ const TransactionSchema = new Schema<ITransaction>(
     },
     idempotencyKey: { type: String, required: true, unique: true, index: true },
     paymentReference: { type: String },
+    razorpayOrderId: { type: String, index: true },
+    razorpayTransferId: { type: String },
+    payoutStatus: {
+      type: String,
+      enum: ['PENDING', 'TRANSFER_PENDING', 'TRANSFERRED', 'TRANSFER_FAILED'],
+    },
     paymentStatus: {
       type: String,
       enum: ['UNVERIFIED', 'PENDING', 'AUTOPAY_SCHEDULED', 'PAID', 'FAILED'],
       default: 'UNVERIFIED',
       index: true,
     },
+    deferredPaymentConsent: { type: Boolean, default: false },
+    deferredPaymentConsentAt: { type: Date },
+    autopayStatus: {
+      type: String,
+      enum: [
+        'SCHEDULING',
+        'SCHEDULED',
+        'CAPTURED',
+        'FAILED',
+        'TRANSFER_PENDING',
+        'TRANSFERRED',
+        'TRANSFER_FAILED',
+      ],
+    },
+    autopayPaymentAfter: { type: Date },
     failureReason: { type: String },
     offlineCreated: { type: Boolean, default: false },
     syncedAt: { type: Date },

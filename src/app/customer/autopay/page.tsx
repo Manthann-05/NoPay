@@ -21,51 +21,6 @@ interface Mandate {
   activatedAt?: string;
 }
 
-interface RazorpayCheckoutResponse {
-  razorpay_order_id: string;
-  razorpay_payment_id: string;
-  razorpay_signature: string;
-}
-
-interface RazorpayCheckoutOptions {
-  key: string;
-  order_id: string;
-  amount: number;
-  currency: string;
-  name: string;
-  description: string;
-  prefill: { name: string; email: string; contact: string };
-  config: {
-    display: {
-      blocks: Record<
-        string,
-        {
-          name: string;
-          instruments: { method: string }[];
-        }
-      >;
-      sequence: string[];
-      preferences: { show_default_blocks: boolean };
-    };
-  };
-  handler: (response: RazorpayCheckoutResponse) => void;
-  modal: { ondismiss: () => void };
-}
-
-interface RazorpayCheckoutInstance {
-  open: () => void;
-}
-
-interface RazorpayConstructor {
-  new (options: RazorpayCheckoutOptions): RazorpayCheckoutInstance;
-}
-
-declare global {
-  interface Window {
-    Razorpay?: RazorpayConstructor;
-  }
-}
-
 export default function CustomerAutoPayPage() {
   const router = useRouter();
   const [merchants, setMerchants] = useState<MerchantOption[]>([]);
@@ -89,6 +44,23 @@ export default function CustomerAutoPayPage() {
       }
       setMerchants(data.merchants || []);
       setMandates(data.mandates || []);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(
+          'nopay_active_autopay_mandates',
+          JSON.stringify(
+            {
+              ownerId: data.customerId,
+              mandates: (data.mandates || [])
+                .filter((mandate: Mandate) => mandate.status === 'ACTIVE')
+                .map((mandate: Mandate) => ({
+                  merchantId: mandate.merchantId,
+                  maxAmount: mandate.maxAmount,
+                  expiresAt: mandate.expiresAt,
+                })),
+            }
+          )
+        );
+      }
       setEnabled(Boolean(data.enabled));
     } catch {
       setError('Could not load merchant AutoPay settings. Check your internet connection.');

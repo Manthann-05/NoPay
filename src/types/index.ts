@@ -88,6 +88,9 @@ export interface Transaction {
   type: TransactionType;
   status: TransactionStatus;
   paymentStatus?: 'UNVERIFIED' | 'PENDING' | 'AUTOPAY_SCHEDULED' | 'PAID' | 'FAILED';
+  payoutStatus?: 'PENDING' | 'TRANSFER_PENDING' | 'TRANSFERRED' | 'TRANSFER_FAILED';
+  deferredPaymentConsent?: boolean;
+  deferredPaymentConsentAt?: string;
   autopayStatus?:
     | 'SCHEDULING'
     | 'SCHEDULED'
@@ -99,6 +102,8 @@ export interface Transaction {
   autopayPaymentAfter?: string;
   idempotencyKey: string;
   paymentReference?: string;
+  razorpayOrderId?: string;
+  razorpayTransferId?: string;
   failureReason?: string;
   offlineCreated?: boolean;
   offlineReceived?: boolean;

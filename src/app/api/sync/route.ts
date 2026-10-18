@@ -108,57 +108,61 @@ export async function POST(req: Request) {
       }
 
       const bill = await Bill.findOne({ billId: validated.billId });
-      if (bill) {
-        if (String(bill.merchantId) !== String(merchant._id)) {
-          return NextResponse.json(
-            { success: false, error: 'This bill does not belong to the scanned merchant.' },
-            { status: 400 }
-          );
-        }
-
-        if (bill.status === 'EXPIRED' || bill.status === 'CANCELLED') {
-          return NextResponse.json({ success: false, error: 'Bill Expired' }, { status: 400 });
-        }
-
-        if (isBillExpired(bill.expiresAt)) {
-          bill.status = 'EXPIRED';
-          await bill.save();
-          return NextResponse.json({ success: false, error: 'Bill Expired' }, { status: 400 });
-        }
-
-        if (bill.transactionId && bill.transactionId !== validated.transactionId) {
-          return NextResponse.json(
-            { success: false, error: 'This transaction does not match the bill.' },
-            { status: 400 }
-          );
-        }
-
-        if (bill.status === 'PAID') {
-          return NextResponse.json({ success: false, error: 'This bill has already been paid.' }, { status: 409 });
-        }
-
-        if (!amountsMatch(validated.amount, bill.total)) {
-          return NextResponse.json(
-            { success: false, error: 'Amount does not match the bill total.' },
-            { status: 400 }
-          );
-        }
-
-        if (bill.customerId && String(bill.customerId) !== String(session.userId)) {
-          return NextResponse.json({ success: false, error: 'This bill is assigned to another customer.' }, { status: 409 });
-        }
-
-        amount = Number(bill.total);
-        billSummary = {
-          itemsCount: bill.items.length,
-          total: bill.total,
-        };
-        bill.customerId = new mongoose.Types.ObjectId(session.userId);
-        bill.status = 'PENDING';
-        await bill.save();
-        billForAutoPay = bill;
-        paymentStatus = 'PENDING';
+      if (!bill) {
+        return NextResponse.json(
+          { success: false, error: 'This bill is not registered with NoPay and cannot be collected.' },
+          { status: 400 }
+        );
       }
+      if (String(bill.merchantId) !== String(merchant._id)) {
+        return NextResponse.json(
+          { success: false, error: 'This bill does not belong to the scanned merchant.' },
+          { status: 400 }
+        );
+      }
+
+      if (bill.status === 'EXPIRED' || bill.status === 'CANCELLED') {
+        return NextResponse.json({ success: false, error: 'Bill Expired' }, { status: 400 });
+      }
+
+      if (isBillExpired(bill.expiresAt)) {
+        bill.status = 'EXPIRED';
+        await bill.save();
+        return NextResponse.json({ success: false, error: 'Bill Expired' }, { status: 400 });
+      }
+
+      if (bill.transactionId && bill.transactionId !== validated.transactionId) {
+        return NextResponse.json(
+          { success: false, error: 'This transaction does not match the bill.' },
+          { status: 400 }
+        );
+      }
+
+      if (bill.status === 'PAID') {
+        return NextResponse.json({ success: false, error: 'This bill has already been paid.' }, { status: 409 });
+      }
+
+      if (!amountsMatch(validated.amount, bill.total)) {
+        return NextResponse.json(
+          { success: false, error: 'Amount does not match the bill total.' },
+          { status: 400 }
+        );
+      }
+
+      if (bill.customerId && String(bill.customerId) !== String(session.userId)) {
+        return NextResponse.json({ success: false, error: 'This bill is assigned to another customer.' }, { status: 409 });
+      }
+
+      amount = Number(bill.total);
+      billSummary = {
+        itemsCount: bill.items.length,
+        total: bill.total,
+      };
+      bill.customerId = new mongoose.Types.ObjectId(session.userId);
+      bill.status = 'PENDING';
+      await bill.save();
+      billForAutoPay = bill;
+      paymentStatus = 'PENDING';
     }
 
     const newTxn = await Transaction.create({
@@ -173,6 +177,9 @@ export async function POST(req: Request) {
       type: validated.type,
       status: 'CONFIRMED',
       paymentStatus,
+      deferredPaymentConsent: validated.type === 'BILL_QR' && validated.deferredPaymentConsent,
+      deferredPaymentConsentAt:
+        validated.type === 'BILL_QR' && validated.deferredPaymentConsent ? new Date() : undefined,
       idempotencyKey: validated.idempotencyKey,
       offlineCreated: validated.offlineCreated,
       syncedAt: new Date(),

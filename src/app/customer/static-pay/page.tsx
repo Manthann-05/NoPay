@@ -212,7 +212,11 @@ export default function CustomerStaticPayPage() {
           {!isOnline && (
             <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-semibold">
               <WifiOff className="w-4 h-4 shrink-0 text-amber-600" />
-              <span>NoPay cannot verify this merchant while offline. Confirm the Merchant ID with the shop. This creates only a pending record, not a payment; show its QR to the merchant for a separate copy.</span>
+              <span>
+                NoPay cannot verify this merchant while offline. This saves only an unpaid record on this device; the
+                merchant cannot see it until it syncs. After reconnecting, review the merchant and amount and complete
+                payment online. The record itself is not proof of payment.
+              </span>
             </div>
           )}
 
@@ -264,7 +268,7 @@ export default function CustomerStaticPayPage() {
               className="w-full py-4 bg-brand-blue hover:bg-brand-darkBlue text-white font-black rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base disabled:opacity-50"
             >
               {loading ? (
-                <span>Processing Payment…</span>
+                <span>Saving record…</span>
               ) : (
                 <>
                   <CreditCard className="w-5 h-5" />

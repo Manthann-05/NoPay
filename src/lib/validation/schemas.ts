@@ -59,5 +59,6 @@ export const TransactionSyncSchema = z.object({
   type: z.enum(['STATIC_QR', 'BILL_QR']),
   idempotencyKey: z.string().min(1, 'Idempotency key is required'),
   offlineCreated: z.boolean().default(true),
+  deferredPaymentConsent: z.boolean().optional().default(false),
   createdAt: z.string().optional(),
 });

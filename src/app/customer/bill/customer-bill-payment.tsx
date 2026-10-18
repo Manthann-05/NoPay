@@ -9,6 +9,7 @@ import { readScannedQr } from '@/lib/qr/scanHandoff';
 import { isBillExpired } from '@/lib/status/labels';
 import { useSnackbar } from '@/components/shared/SnackbarProvider';
 import { CreditCard, ArrowLeft, ShieldCheck, WifiOff } from 'lucide-react';
+import Link from 'next/link';
 
 // Force dynamic rendering to avoid pre-rendering issues with client-side hooks
 export const dynamic = 'force-dynamic';
@@ -22,6 +23,8 @@ export function CustomerBillPayment({ billIdParam }: { billIdParam?: string }) {
   const [loading, setLoading] = useState<boolean>(true);
   const [paying, setPaying] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [deferredPaymentConsent, setDeferredPaymentConsent] = useState(false);
+  const [activeMandateLimit, setActiveMandateLimit] = useState<number | null>(null);
 
   useEffect(() => {
     const scanned = readScannedQr();
@@ -91,6 +94,71 @@ export function CustomerBillPayment({ billIdParam }: { billIdParam?: string }) {
     }
   }, [billIdParam, isOnline]);
 
+  useEffect(() => {
+    if (!bill) return;
+    const merchantId = bill.merchantId;
+    const readCachedMandate = async () => {
+      try {
+        const { getLocalSession } = await import('@/offline/session');
+        const session = await getLocalSession();
+        const cached = JSON.parse(
+          localStorage.getItem('nopay_active_autopay_mandates') || 'null'
+        ) as {
+          ownerId?: string;
+          mandates?: { merchantId: string; maxAmount: number; expiresAt: string }[];
+        } | null;
+        const mandate =
+          cached && session && cached.ownerId === session.userId
+            ? cached.mandates?.find(
+                (entry) =>
+                  entry.merchantId === merchantId &&
+                  new Date(entry.expiresAt).getTime() > Date.now()
+              )
+            : undefined;
+        setActiveMandateLimit(mandate?.maxAmount ?? null);
+      } catch (cause) {
+        console.error('Could not read cached AutoPay mandate:', cause);
+        setActiveMandateLimit(null);
+      }
+    };
+
+    readCachedMandate();
+    if (isOnline) {
+      void fetch('/api/autopay/mandates')
+        .then(async (response) => {
+          if (!response.ok) return;
+          const data = await response.json();
+          const mandates = (data.mandates || []) as {
+            merchantId: string;
+            maxAmount: number;
+            expiresAt: string;
+            status: string;
+          }[];
+          localStorage.setItem(
+            'nopay_active_autopay_mandates',
+            JSON.stringify({
+              ownerId: data.customerId,
+              mandates: mandates
+                .filter((mandate) => mandate.status === 'ACTIVE')
+                .map(({ merchantId: id, maxAmount, expiresAt }) => ({
+                  merchantId: id,
+                  maxAmount,
+                  expiresAt,
+                })),
+            })
+          );
+          const mandate = mandates.find(
+            (entry) =>
+              entry.merchantId === merchantId &&
+              entry.status === 'ACTIVE' &&
+              new Date(entry.expiresAt).getTime() > Date.now()
+          );
+          setActiveMandateLimit(mandate?.maxAmount ?? null);
+        })
+        .catch((cause) => console.error('Could not refresh AutoPay mandate status:', cause));
+    }
+  }, [bill, isOnline]);
+
   const handlePayBill = async () => {
     if (!bill) return;
     if (isBillExpired(bill.expiresAt)) {
@@ -130,6 +198,7 @@ export function CustomerBillPayment({ billIdParam }: { billIdParam?: string }) {
       amount: bill.total,
       type: 'BILL_QR',
       status: 'PENDING_SYNC',
+      deferredPaymentConsent: !isOnline && deferredPaymentConsent,
       idempotencyKey,
       items: bill.items.map((i) => ({
         name: i.name,
@@ -261,9 +330,44 @@ export function CustomerBillPayment({ billIdParam }: { billIdParam?: string }) {
             )}
 
             {!isOnline && (
-              <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-semibold">
-                <WifiOff className="w-4 h-4 shrink-0 text-amber-600" />
-                <span>You&apos;re offline. This creates a pending record on your device. It will sync when you reconnect; the merchant cannot see it while you are offline.</span>
+              <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+                <div className="flex items-start gap-2">
+                  <WifiOff className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                  <span>
+                    You&apos;re offline. This saves an unpaid bill record on your device. The merchant cannot see it
+                    until it syncs.
+                  </span>
+                </div>
+                {activeMandateLimit !== null && bill.total <= activeMandateLimit ? (
+                  <label className="flex items-start gap-2 border-t border-amber-200 pt-3 leading-5">
+                    <input
+                      type="checkbox"
+                      checked={deferredPaymentConsent}
+                      onChange={(event) => setDeferredPaymentConsent(event.target.checked)}
+                      className="mt-1"
+                    />
+                    <span>
+                      Request <strong>Pay when online</strong> for this ₹{bill.total.toFixed(2)} merchant bill using
+                      my active AutoPay mandate. If NoPay verifies the bill and mandate after sync, Razorpay will send
+                      its required pre-debit notice before any debit. This does not guarantee collection; the merchant
+                      must treat this as unpaid until capture is confirmed.
+                    </span>
+                  </label>
+                ) : activeMandateLimit !== null ? (
+                  <p className="border-t border-amber-200 pt-3 leading-5">
+                    This bill exceeds your ₹{activeMandateLimit.toFixed(2)} per-debit mandate limit. Save it as unpaid
+                    and complete payment online after reconnecting.
+                  </p>
+                ) : (
+                  <p className="border-t border-amber-200 pt-3 leading-5">
+                    No active merchant-specific AutoPay mandate is available on this device. You can authorize one
+                    while online in{' '}
+                    <Link href="/customer/autopay" className="font-bold underline">
+                      AutoPay settings
+                    </Link>
+                    , or complete payment online after reconnecting.
+                  </p>
+                )}
               </div>
             )}
 
@@ -318,11 +422,17 @@ export function CustomerBillPayment({ billIdParam }: { billIdParam?: string }) {
               className="w-full py-4 bg-brand-blue hover:bg-brand-darkBlue text-white font-black rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base disabled:opacity-50"
             >
               {paying ? (
-                <span>Confirming Bill Payment…</span>
+                <span>Saving bill record…</span>
               ) : (
                 <>
                   <CreditCard className="w-5 h-5" />
-                  <span>Create Bill Record ₹{bill.total.toFixed(2)}</span>
+                  <span>
+                    {!isOnline && deferredPaymentConsent
+                      ? 'Save bill & request Pay when online'
+                      : 'Save unpaid bill record'}{' '}
+                    · ₹
+                    {bill.total.toFixed(2)}
+                  </span>
                 </>
               )}
             </button>
