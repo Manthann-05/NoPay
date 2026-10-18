@@ -31,47 +31,6 @@ export async function addOfflineTransaction(txn: Transaction): Promise<OfflineSy
   return queueItem;
 }
 
-export async function recordReceivedOfflineTransaction(txn: Transaction): Promise<boolean> {
-  const receivedTxn: Transaction = {
-    ...txn,
-    status: 'PENDING_SYNC',
-    offlineCreated: true,
-    offlineReceived: true,
-    updatedAt: new Date().toISOString(),
-  };
-
-  const inserted = await offlineDb.transaction('rw', offlineDb.transactions, async () => {
-    const existingById = await offlineDb.transactions.get(receivedTxn.transactionId);
-    if (existingById) {
-      if (existingById.idempotencyKey !== receivedTxn.idempotencyKey) {
-        throw new Error('A different transaction already uses this transaction ID.');
-      }
-      return false;
-    }
-
-    const existingByKey = await offlineDb.transactions
-      .where('idempotencyKey')
-      .equals(receivedTxn.idempotencyKey)
-      .first();
-    if (existingByKey) {
-      throw new Error('This payment QR was already used for a different transaction.');
-    }
-
-    await offlineDb.transactions.add(receivedTxn);
-    return true;
-  });
-
-  if (inserted) {
-    broadcastTransactionEvent({
-      transaction: receivedTxn,
-      isOffline: true,
-      action: 'CREATED',
-    });
-  }
-
-  return inserted;
-}
-
 export async function getPendingSyncQueue(): Promise<OfflineSyncQueueItem[]> {
   const pending = await offlineDb.syncQueue.where('state').equals('PENDING_SYNC').toArray();
   const retrying = await offlineDb.syncQueue.where('state').equals('RETRY_PENDING').toArray();

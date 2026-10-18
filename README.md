@@ -11,10 +11,10 @@ NoPay is a production-grade, genuine **Offline-First Progressive Web Application
 > Instead, NoPay provides:
 > 1. **Offline Bill Generation & Itemized Cart**: Merchants can create bills and calculate totals entirely on-device without internet.
 > 2. **Offline-Capable NoPay QR Codes**: Static merchant and itemized bill QR codes contain self-contained payloads readable by the NoPay scanner offline. Merchant IDs and QR-provided names are shown for identification, but cannot be server-verified while offline. In-app scanning accepts only versioned NoPay QR payloads; external bank/UPI QR codes are rejected.
-> 3. **Offline Transaction Records**: Customer payment intents are saved to browser IndexedDB with unique UUID idempotency keys and timestamps. Customers can show a transaction QR so the merchant can store an independent pending copy on the merchant device.
+> 3. **Offline Transaction Records**: Customer payment intents are saved to browser IndexedDB with unique UUID idempotency keys and timestamps. They sync to the NoPay ledger after the customer reconnects; a merchant cannot see a customer's local record while both devices are offline.
 > 4. **Deferred Auto-Sync**: When internet connectivity returns, transactions are sent in order to the central ledger with automatic retries, backoff, and duplicate rejection.
 >
-> A transaction QR is a customer-presented record, not proof that cash or bank funds were transferred. NoPay does not verify or settle offline payments.
+> An offline transaction record is stored on the customer device until it can sync; it is not proof that cash or bank funds were transferred. NoPay does not verify or settle offline payments.
 >
 > **Optional AutoPay recovery:** When enabled and available on the NoPay Razorpay account, a customer may authorize a separate UPI mandate for a specific merchant with a maximum debit amount. After an eligible, server-stored merchant bill is matched to that customer, NoPay can request a debit with Razorpay's required pre-debit notice (typically at least 24 hours). Syncing an offline record alone never proves payment or authorizes a debit. A captured payment and its merchant transfer have separate states; a captured debit does not mean the merchant's bank settlement is complete.
 
@@ -25,6 +25,12 @@ AutoPay is disabled unless both `RAZORPAY_AUTOPAY_ENABLED` and `RAZORPAY_ROUTE_E
 For each eligible bill, NoPay requests a debit up to the customer-approved mandate cap. The debit is not immediate on sync: the customer receives the provider's pre-debit notice before the scheduled collection. Only a signed Razorpay capture webhook marks the bill paid. NoPay then creates an idempotent Route direct transfer for the bill's full amount. This makes NoPay responsible for provider fees and requires sufficient available NoPay account balance to fund both payouts and applicable fees; a payout can remain pending or fail even after the customer debit is captured. Customers can revoke a mandate, and merchant-issued bills are the only eligible records—customer-created offline/static-QR records are excluded.
 
 Set `RAZORPAY_WEBHOOK_SECRET` to the secret configured for the Razorpay webhook endpoint `/api/payments/webhook`. Subscribe it to the payment, token, transfer, and Route account events handled by the endpoint. Keep both feature flags off until the provider features, webhook configuration, and merchant payout flow have been tested with the Razorpay account.
+
+### Merchant shop verification documents
+
+Merchants can submit their legal business name, business structure, GSTIN, address, and supporting PDFs/JPEGs/PNGs from **Profile → Shop verification**. Files are limited to 10 MB and uploaded directly to a private S3-compatible bucket using a short-lived, size-constrained upload form. MongoDB stores document metadata and private object keys; documents are only downloadable through the authenticated merchant account. Configure `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY`; set `S3_ENDPOINT` for S3-compatible services such as Cloudflare R2 or MinIO. Ensure the bucket is private, encrypted at rest, and its CORS rules permit browser POST uploads from the application origin.
+
+The document list covers common business proof categories (GST registration, PAN, shop/trade licence, address proof, business registration, and owner/authorised representative ID), but actual requirements vary. The merchant portal records submissions as **not verified** until independently reviewed. An in-app reviewer/admin approval workflow is not implemented yet.
 
 ---
 
@@ -74,7 +80,7 @@ Set `RAZORPAY_WEBHOOK_SECRET` to the secret configured for the Razorpay webhook 
 
 2. **IndexedDB Schema via Dexie.js (`src/offline/db.ts`)**:
    - `localSession`: Caches user identity, roles, active role, and merchant profile offline (no tokens or passwords).
-   - `transactions`: Local transaction records. Each device keeps its own copy; a customer can transfer a pending record to the merchant by showing its transaction QR.
+   - `transactions`: Local transaction records. Each device keeps its own copy; a customer's offline record syncs after that customer reconnects.
    - `syncQueue`: Offline sync queue storing items with state (`PENDING_SYNC`, `RETRY_PENDING`, `SYNCED`, `REJECTED`), attempt counts, backoff timings, and idempotency keys.
    - `bills`: Local store for itemized bills generated offline by the merchant.
    - `products`: Cached product catalog for offline POS search, stock display, and barcode lookups.
@@ -161,7 +167,7 @@ To test and verify the genuine offline experience:
    - **The app loads instantly without any network connection.**
    - Notice the layout renders, user identity remains intact from IndexedDB, and navigation works.
 
-### Step 3: Perform Offline Billing & Scanning
+### Step 3: Create an Offline Customer Record
 1. Switch to **Merchant Mode** -> go to `/merchant/billing`:
    - Inventory catalog loads from local IndexedDB.
    - Add items to the cart or add custom items.
@@ -170,10 +176,8 @@ To test and verify the genuine offline experience:
 2. In another window/tab (or same device):
    - Go to `/customer/scan` or enter `/customer/static-pay`:
    - Enter an amount (e.g. ₹250) and submit. The transaction is recorded in customer IndexedDB with status `PENDING_SYNC`.
-   - Show the transaction QR on the result screen.
-   - On the merchant device, open `/merchant/transactions`, choose **Scan Customer QR**, and scan the displayed QR.
-   - The merchant ledger now has its own `PENDING_SYNC` copy. Both copies are local and pending; the QR does not verify payment.
-   - Check `/customer/transactions` and `/merchant/transactions` to confirm the record appears on each device.
+   - The customer record is stored locally as `PENDING_SYNC`. It is not visible on the merchant's device while both devices are offline and is not proof of payment.
+   - Check `/customer/transactions` for the pending record. After reconnecting, it syncs to the NoPay ledger.
 
 ### Step 4: Reconnect & Verify Automatic Synchronization
 1. In DevTools **Network** tab, uncheck **Offline** (restore internet connectivity).

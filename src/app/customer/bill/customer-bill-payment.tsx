@@ -189,7 +189,7 @@ export function CustomerBillPayment({ billIdParam }: { billIdParam?: string }) {
       showSnackbar({
         type: 'pending',
         title: 'Offline Bill Record Saved',
-        description: `₹${bill.total.toFixed(2)} saved on this device. Show the transaction QR to the merchant to save an independent pending copy.`,
+        description: `₹${bill.total.toFixed(2)} saved on this device. It will sync when you reconnect; the merchant cannot see it while you are offline.`,
         durationMs: 5500,
       });
       window.location.assign('/customer/payment?status=queued');
@@ -263,7 +263,7 @@ export function CustomerBillPayment({ billIdParam }: { billIdParam?: string }) {
             {!isOnline && (
               <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-semibold">
                 <WifiOff className="w-4 h-4 shrink-0 text-amber-600" />
-                <span>You&apos;re offline. This creates a pending record on your device. After you show its transaction QR, the merchant can save a separate copy.</span>
+                <span>You&apos;re offline. This creates a pending record on your device. It will sync when you reconnect; the merchant cannot see it while you are offline.</span>
               </div>
             )}
 

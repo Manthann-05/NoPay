@@ -131,7 +131,7 @@ export default function MerchantDashboardPage() {
           </span>
           <h1 className="text-2xl sm:text-3xl font-black text-white">Merchant Dashboard</h1>
           <p className="text-xs text-slate-300 max-w-xl">
-            Create bills and exchange pending transaction records offline. Records are not payment settlement or proof that funds were received.
+            Create bills and review transaction records. Customer records created offline sync after the customer reconnects; a pending record is not proof that funds were received.
           </p>
         </div>
 
@@ -186,7 +186,7 @@ export default function MerchantDashboardPage() {
               </span>
             )}
           </div>
-          <p className="text-[11px] text-slate-500 font-medium">Some may be customer-submitted copies</p>
+          <p className="text-[11px] text-slate-500 font-medium">Offline records sync after reconnection</p>
         </div>
 
         <div className="bg-white p-5 lg:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
@@ -237,7 +237,7 @@ export default function MerchantDashboardPage() {
           <h3 className="text-base font-black text-navy-900 group-hover:text-amber-600 transition-colors">
             Pending Records ({stats.pendingRecordCount})
           </h3>
-          <p className="text-xs text-slate-500">Review records and scan customer transaction QR codes</p>
+          <p className="text-xs text-slate-500">Review transaction records and their status</p>
         </Link>
 
         <Link

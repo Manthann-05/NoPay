@@ -84,94 +84,101 @@ export default function MerchantStaticQrPage() {
   });
 
   return (
-    <div className="max-w-xl mx-auto py-8 px-4 space-y-6">
-      <div className="text-center space-y-2">
+    <div className="max-w-7xl mx-auto py-8 px-4 space-y-6">
+      <div className="space-y-2">
         <h1 className="text-2xl font-black text-navy-900">Permanent Merchant Static QR</h1>
-        <p className="text-xs text-slate-500">
-          Display or print this QR poster for your counter. For offline records, ask the customer to show their transaction QR and scan it from Merchant Transaction Records.
+        <p className="max-w-3xl text-sm text-slate-500">
+          Display or print this QR poster for your counter. Customer-created offline records sync after the customer reconnects.
         </p>
       </div>
 
-      {/* Printable Poster Container */}
-      <div className="bg-white rounded-3xl border-2 border-slate-200 p-8 shadow-card text-center space-y-6 print:border-none print:shadow-none">
-        <div className="space-y-2">
-          <div className="w-14 h-14 bg-navy-900 text-white rounded-2xl flex items-center justify-center mx-auto shadow-md">
-            <Store className="w-7 h-7 text-brand-lightBlue" />
-          </div>
-          <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
-            OFFICIAL NOPAY MERCHANT QR
-          </span>
-          <h2 className="text-2xl font-black text-navy-900">{merchant.name}</h2>
-          <p className="text-xs font-mono text-slate-400">Merchant ID: {merchant.id}</p>
-        </div>
-
-        <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 inline-block shadow-inner">
-          <QrCodeGenerator value={qrPayload} size={240} />
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-xs font-extrabold text-navy-900">Scan & Pay Any Amount</p>
-          <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-            This identifies your shop. It does not transfer or verify payment. Offline transaction records must be handed to the merchant by QR.
-          </p>
-        </div>
-
-        <div className="pt-4 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] text-slate-400 font-semibold">
-          <ShieldCheck className="w-4 h-4 text-emerald-500" />
-          <span>NoPay Merchant QR</span>
-        </div>
-      </div>
-
-      {/* Live Counter Payment Monitor for Static QR */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4 print:hidden">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <History className="w-4 h-4 text-brand-blue" />
-            <h3 className="text-sm font-bold text-navy-900">Local Static QR Records</h3>
-          </div>
-          <span className="text-[10px] bg-slate-100 font-bold text-slate-600 px-2 py-0.5 rounded-full">
-            This device
-          </span>
-        </div>
-
-        {incomingTxns.length === 0 ? (
-          <div className="p-4 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-            No transaction records on this device yet.
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {incomingTxns.map((txn) => (
-              <div key={txn.transactionId} className="py-2.5 flex items-center justify-between text-xs">
-                <div>
-                  <div className="flex items-center gap-1.5 font-bold text-navy-900">
-                    <span>{txn.customerName || 'Customer'}</span>
-                    <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded ${transactionStatusTone(txn.status)}`}>
-                      {transactionStatusLabel(txn.status)}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-slate-400 font-mono">{txn.transactionId}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-sm font-black text-brand-blue">₹{txn.amount.toFixed(2)}</span>
-                  <div className="text-[10px] text-slate-400">
-                    {new Date(txn.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                </div>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
+        <div className="space-y-5">
+          {/* Printable Poster Container */}
+          <div className="bg-white rounded-3xl border-2 border-slate-200 p-6 sm:p-8 shadow-card text-center space-y-5 print:border-none print:shadow-none">
+            <div className="space-y-2">
+              <div className="w-14 h-14 bg-navy-900 text-white rounded-2xl flex items-center justify-center mx-auto shadow-md">
+                <Store className="w-7 h-7 text-brand-lightBlue" />
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
+                OFFICIAL NOPAY MERCHANT QR
+              </span>
+              <h2 className="text-2xl font-black text-navy-900">{merchant.name}</h2>
+              <p className="text-xs font-mono text-slate-400">Merchant ID: {merchant.id}</p>
+            </div>
 
-      {/* Control Buttons */}
-      <div className="flex gap-3 print:hidden">
-        <button
-          onClick={() => window.print()}
-          className="flex-1 py-3.5 bg-navy-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
-        >
-          <Printer className="w-4 h-4 text-brand-lightBlue" />
-          <span>Print QR Poster</span>
-        </button>
+            <div className="p-2 sm:p-5 bg-slate-50 rounded-2xl border border-slate-100 inline-block shadow-inner">
+              <QrCodeGenerator value={qrPayload} size={200} />
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-xs font-extrabold text-navy-900">Scan &amp; Pay Any Amount</p>
+              <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                This QR identifies your shop. It does not transfer or verify payment. Offline customer records stay on the customer&apos;s device until they reconnect.
+              </p>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] text-slate-400 font-semibold">
+              <ShieldCheck className="w-4 h-4 text-emerald-500" />
+              <span>NoPay Merchant QR</span>
+            </div>
+          </div>
+
+          <div className="flex print:hidden">
+            <button
+              onClick={() => window.print()}
+              className="w-full py-3.5 bg-navy-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+            >
+              <Printer className="w-4 h-4 text-brand-lightBlue" />
+              <span>Print QR Poster</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Local static QR transaction records */}
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4 print:hidden">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <History className="w-4 h-4 text-brand-blue" />
+              <h3 className="text-sm font-bold text-navy-900">Static QR Transactions</h3>
+            </div>
+            <span className="shrink-0 text-[10px] bg-slate-100 font-bold text-slate-600 px-2 py-0.5 rounded-full">
+              This device
+            </span>
+          </div>
+
+          <p className="text-xs leading-5 text-slate-500">
+            These are records already available on this device. A customer&apos;s offline record is not visible here until it syncs after reconnection.
+          </p>
+
+          {incomingTxns.length === 0 ? (
+            <div className="p-5 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+              No static QR transactions are stored on this device yet.
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {incomingTxns.map((txn) => (
+                <div key={txn.transactionId} className="py-3 flex items-center justify-between gap-4 text-xs">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-1.5 font-bold text-navy-900">
+                      <span>{txn.customerName || 'Customer'}</span>
+                      <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded ${transactionStatusTone(txn.status)}`}>
+                        {transactionStatusLabel(txn.status)}
+                      </span>
+                    </div>
+                    <span className="block truncate text-[10px] text-slate-400 font-mono">{txn.transactionId}</span>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <span className="text-sm font-black text-brand-blue">₹{txn.amount.toFixed(2)}</span>
+                    <div className="text-[10px] text-slate-400">
+                      {new Date(txn.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

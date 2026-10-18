@@ -151,7 +151,7 @@ export default function CustomerStaticPayPage() {
       showSnackbar({
         type: 'pending',
         title: 'Offline Record Saved',
-        description: `₹${numAmount.toFixed(2)} saved on this device. Show the transaction QR to the merchant to save an independent pending copy.`,
+        description: `₹${numAmount.toFixed(2)} saved on this device. It will sync when you reconnect; the merchant cannot see it while you are offline.`,
         durationMs: 5500,
       });
       window.location.assign('/customer/payment?status=queued');
