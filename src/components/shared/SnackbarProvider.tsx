@@ -57,42 +57,43 @@ export function SnackbarProvider({ children }: { children: ReactNode }) {
           let icon = <Info className="w-5 h-5 text-blue-400 shrink-0" />;
 
           if (item.type === 'success') {
-            toneStyles = 'bg-emerald-950/95 text-emerald-50 border-emerald-800 shadow-emerald-950/20';
-            icon = <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />;
+            toneStyles = 'bg-surface text-foreground border-2 border-emerald-500 shadow-[4px_4px_0px_0px_rgba(16,185,129,1)]';
+            icon = <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />;
           } else if (item.type === 'pending') {
-            toneStyles = 'bg-amber-950/95 text-amber-50 border-amber-800 shadow-amber-950/20';
-            icon = <Clock className="w-5 h-5 text-amber-400 shrink-0 animate-pulse" />;
+            toneStyles = 'bg-surface text-foreground border-2 border-amber-500 shadow-[4px_4px_0px_0px_rgba(245,158,11,1)]';
+            icon = <Clock className="w-5 h-5 text-amber-500 shrink-0 animate-pulse" />;
           } else if (item.type === 'warning') {
-            toneStyles = 'bg-yellow-950/95 text-yellow-50 border-yellow-800 shadow-yellow-950/20';
-            icon = <AlertTriangle className="w-5 h-5 text-yellow-400 shrink-0" />;
+            toneStyles = 'bg-surface text-foreground border-2 border-amber-500 shadow-[4px_4px_0px_0px_rgba(245,158,11,1)]';
+            icon = <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />;
           } else if (item.type === 'error') {
-            toneStyles = 'bg-rose-950/95 text-rose-50 border-rose-800 shadow-rose-950/20';
-            icon = <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />;
+            toneStyles = 'bg-surface text-foreground border-2 border-rose-500 shadow-[4px_4px_0px_0px_rgba(244,63,94,1)]';
+            icon = <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />;
           }
 
           return (
             <div
               key={item.id}
-              className={`pointer-events-auto flex items-start gap-3 p-4 rounded-2xl border backdrop-blur-md shadow-2xl transition-all duration-300 transform translate-y-0 opacity-100 ${toneStyles}`}
+              className={`pointer-events-auto flex items-start gap-3 p-4 font-mono transition-all duration-200 transform translate-y-0 opacity-100 ${toneStyles}`}
             >
               <div className="pt-0.5">{icon}</div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-black leading-tight tracking-wide">{item.title}</p>
+                <p className="text-xs font-black uppercase leading-tight tracking-wide">{item.title}</p>
                 {item.description && (
-                  <p className="text-[11px] opacity-80 mt-1 leading-relaxed break-words">
+                  <p className="text-[11px] text-foreground-muted mt-1 leading-relaxed break-words font-medium">
                     {item.description}
                   </p>
                 )}
               </div>
               <button
                 onClick={() => dismissSnackbar(item.id)}
-                className="opacity-60 hover:opacity-100 transition-opacity p-0.5 -mr-1 -mt-1 text-inherit"
+                className="opacity-70 hover:opacity-100 transition-opacity p-0.5 -mr-1 -mt-1 text-inherit"
                 aria-label="Close notification"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
           );
+
         })}
       </div>
     </SnackbarContext.Provider>

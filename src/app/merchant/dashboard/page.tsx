@@ -9,21 +9,17 @@ import { Transaction } from '@/types';
 import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
 import { useSnackbar } from '@/components/shared/SnackbarProvider';
 import {
-  Store,
   CreditCard,
   QrCode,
   Package,
   TrendingUp,
   Clock,
   ArrowRight,
-  PlusCircle,
   FileText,
   BarChart3,
-  RefreshCw,
   Zap,
 } from 'lucide-react';
 
-// Force dynamic rendering to avoid pre-rendering issues with client-side hooks
 export const dynamic = 'force-dynamic';
 
 export default function MerchantDashboardPage() {
@@ -41,14 +37,13 @@ export default function MerchantDashboardPage() {
   useEffect(() => {
     loadDashboardData();
 
-    // Subscribe to live local cross-window transactions
     const unsubscribe = subscribeToTransactionEvents((detail) => {
       loadDashboardData();
       if (detail.action === 'CREATED') {
         showSnackbar({
           type: detail.isOffline ? 'pending' : 'success',
           title: detail.isOffline ? 'New Offline Record Received' : 'Transaction Record Created',
-          description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId}. NoPay has not verified a money transfer.`,
+          description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId}.`,
           durationMs: 5000,
         });
       }
@@ -62,14 +57,12 @@ export default function MerchantDashboardPage() {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      // 1. Load local Dexie data first (completely offline)
       const { offlineDb } = await import('@/offline/db');
       const localTxns = await getOfflineTransactions();
       let productsCount = await offlineDb.products.count();
 
       let serverTxns: Transaction[] = [];
 
-      // 2. Fetch online API products & transactions only if online
       if (typeof navigator !== 'undefined' && navigator.onLine) {
         try {
           const prodRes = await fetch('/api/products');
@@ -88,7 +81,6 @@ export default function MerchantDashboardPage() {
         }
       }
 
-      // Merge transactions
       const map = new Map<string, Transaction>();
       localTxns.forEach((t) => map.set(t.transactionId, t));
       serverTxns.forEach((t) => map.set(t.transactionId, t));
@@ -122,183 +114,185 @@ export default function MerchantDashboardPage() {
   };
 
   return (
-    <div className="w-full py-6 space-y-7">
-      {/* Welcome Banner */}
-      <div className="bg-navy-900 rounded-3xl p-6 lg:p-7 text-white shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-5 border border-slate-800">
+    <div className="w-full py-6 space-y-7 font-mono">
+      {/* Top Welcome Header */}
+      <div className="neo-box p-6 lg:p-7 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
         <div className="space-y-2">
-          <span className="text-[10px] font-extrabold uppercase tracking-widest text-brand-lightBlue px-3 py-1 bg-white/10 rounded-full">
-            Merchant POS Workspace
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-black text-white">Merchant Dashboard</h1>
-          <p className="text-xs text-slate-300 max-w-xl">
-            Create bills and review transaction records. Customer records created offline sync after the customer reconnects; a pending record is not proof that funds were received.
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black uppercase px-2 py-0.5 border border-border bg-foreground text-background">
+              MERCHANT PROTOCOL // POS WORKSPACE
+            </span>
+            <span className="text-[10px] font-bold uppercase text-foreground">
+              [P2P RESILIENT]
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black uppercase text-foreground tracking-tight">
+            MERCHANT COMMAND CENTER
+          </h1>
+          <p className="text-xs text-foreground-muted max-w-xl">
+            Compile customer bills, generate cryptographic dynamic QR barcodes, and monitor local transaction logs.
           </p>
         </div>
 
         <div className="flex flex-wrap lg:flex-nowrap items-center gap-3 shrink-0">
           <Link
             href="/merchant/billing"
-            className="px-6 py-3.5 bg-brand-blue hover:bg-blue-600 text-white font-black rounded-xl text-sm shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+            className="neo-btn text-xs py-3 px-5 flex items-center gap-2"
           >
             <CreditCard className="w-4 h-4" />
-            <span>Open POS Billing</span>
+            <span>OPEN POS BILLING</span>
           </Link>
           <Link
             href="/merchant/static-qr"
-            className="px-5 py-3.5 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-2"
+            className="neo-btn-secondary text-xs py-3 px-4 flex items-center gap-2"
           >
-            <QrCode className="w-4 h-4 text-brand-lightBlue" />
-            <span>Static QR Poster</span>
+            <QrCode className="w-4 h-4" />
+            <span>STATIC QR POSTER</span>
           </Link>
         </div>
       </div>
 
-      {/* Metrics Cards */}
+      {/* Metrics Cards (Neobrutalist solid blocks) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div className="bg-white p-5 lg:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
-          <div className="flex justify-between items-center text-slate-400">
-            <span className="text-xs font-extrabold uppercase tracking-wider">Ledger Record Amount</span>
-            <TrendingUp className="w-5 h-5 text-emerald-500" />
+        <div className="neo-box p-5 space-y-2">
+          <div className="flex justify-between items-center text-foreground-muted">
+            <span className="text-xs font-black uppercase">LEDGER VOLUME</span>
+            <TrendingUp className="w-4 h-4 text-foreground" />
           </div>
-          <p className="text-3xl font-black text-navy-900">₹{stats.recordedAmount.toFixed(2)}</p>
-          <p className="text-[11px] text-slate-500 font-medium">Synced records, not verified settlement</p>
+          <p className="text-3xl font-black text-foreground">₹{stats.recordedAmount.toFixed(2)}</p>
+          <p className="text-[10px] text-foreground-muted uppercase">SYNCED LEDGER ENTRIES</p>
         </div>
 
-        <div className="bg-white p-5 lg:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
-          <div className="flex justify-between items-center text-slate-400">
-            <span className="text-xs font-extrabold uppercase tracking-wider">Transaction Records</span>
-            <FileText className="w-5 h-5 text-brand-blue" />
+        <div className="neo-box p-5 space-y-2">
+          <div className="flex justify-between items-center text-foreground-muted">
+            <span className="text-xs font-black uppercase">RECORD COUNT</span>
+            <FileText className="w-4 h-4 text-foreground" />
           </div>
-          <p className="text-3xl font-black text-navy-900">{stats.totalRecordCount}</p>
-          <p className="text-[11px] text-slate-500 font-medium">Includes offline pending records</p>
+          <p className="text-3xl font-black text-foreground">{stats.totalRecordCount}</p>
+          <p className="text-[10px] text-foreground-muted uppercase">INCLUDES QUEUED ENTRIES</p>
         </div>
 
-        <div className="bg-white p-5 lg:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
-          <div className="flex justify-between items-center text-slate-400">
-            <span className="text-xs font-extrabold uppercase tracking-wider">Pending Records</span>
-            <Clock className="w-5 h-5 text-amber-500" />
+        <div className="neo-box p-5 space-y-2">
+          <div className="flex justify-between items-center text-foreground-muted">
+            <span className="text-xs font-black uppercase">PENDING SYNC</span>
+            <Clock className="w-4 h-4 text-foreground" />
           </div>
           <div className="flex items-center gap-2">
-            <p className="text-3xl font-black text-navy-900">{stats.pendingRecordCount}</p>
+            <p className="text-3xl font-black text-foreground">{stats.pendingRecordCount}</p>
             {stats.pendingRecordCount > 0 && (
-              <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">
-                Not verified
+              <span className="text-[9px] font-black border border-border bg-foreground text-background px-1.5 py-0.2 uppercase">
+                QUEUED
               </span>
             )}
           </div>
-          <p className="text-[11px] text-slate-500 font-medium">Offline records sync after reconnection</p>
+          <p className="text-[10px] text-foreground-muted uppercase">SYNC RESTORES ON CONNECT</p>
         </div>
 
-        <div className="bg-white p-5 lg:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
-          <div className="flex justify-between items-center text-slate-400">
-            <span className="text-xs font-extrabold uppercase tracking-wider">Products</span>
-            <Package className="w-5 h-5 text-purple-500" />
+        <div className="neo-box p-5 space-y-2">
+          <div className="flex justify-between items-center text-foreground-muted">
+            <span className="text-xs font-black uppercase">INVENTORY ITEMS</span>
+            <Package className="w-4 h-4 text-foreground" />
           </div>
-          <p className="text-3xl font-black text-navy-900">{stats.activeProductsCount}</p>
-          <p className="text-[11px] text-slate-500 font-medium">Items in inventory catalog</p>
+          <p className="text-3xl font-black text-foreground">{stats.activeProductsCount}</p>
+          <p className="text-[10px] text-foreground-muted uppercase">ACTIVE PRODUCTS IN CATALOG</p>
         </div>
       </div>
 
-      {/* Quick Action Grid */}
+      {/* Quick Action Navigation */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <Link
           href="/merchant/billing"
-          className="bg-blue-50/70 border border-blue-100 p-5 rounded-2xl hover:border-brand-blue hover:shadow-md transition-all group space-y-2 min-w-0"
+          className="neo-box-interactive p-5 group space-y-2 block"
         >
-          <div className="w-10 h-10 bg-brand-blue text-white rounded-xl flex items-center justify-center font-bold">
+          <div className="w-10 h-10 border-2 border-border bg-foreground text-background flex items-center justify-center font-bold">
             <CreditCard className="w-5 h-5" />
           </div>
-          <h3 className="text-base font-black text-navy-900 group-hover:text-brand-blue transition-colors">
-            POS Billing Workspace
+          <h3 className="text-sm font-black uppercase text-foreground">
+            POS BILLING TERMINAL
           </h3>
-          <p className="text-xs text-slate-500">Live cart building & instant Bill QR generator</p>
+          <p className="text-xs text-foreground-muted">Live cart building & instant bill barcode generator</p>
         </Link>
 
         <Link
           href="/merchant/products"
-          className="bg-slate-50 border border-slate-200 p-5 rounded-2xl hover:border-slate-300 hover:shadow-md transition-all group space-y-2 min-w-0"
+          className="neo-box-interactive p-5 group space-y-2 block"
         >
-          <div className="w-10 h-10 bg-purple-600 text-white rounded-xl flex items-center justify-center font-bold">
+          <div className="w-10 h-10 border-2 border-border bg-foreground text-background flex items-center justify-center font-bold">
             <Package className="w-5 h-5" />
           </div>
-          <h3 className="text-base font-black text-navy-900 group-hover:text-purple-600 transition-colors">
-            Product Catalog
+          <h3 className="text-sm font-black uppercase text-foreground">
+            PRODUCT CATALOG
           </h3>
-          <p className="text-xs text-slate-500">Manage prices, stock & barcode numbers</p>
+          <p className="text-xs text-foreground-muted">Manage offline items, barcodes, prices & stock</p>
         </Link>
 
         <Link
           href="/merchant/transactions"
-          className="bg-amber-50/70 border border-amber-200 p-5 rounded-2xl hover:border-amber-400 hover:shadow-md transition-all group space-y-2 min-w-0"
+          className="neo-box-interactive p-5 group space-y-2 block"
         >
-          <div className="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center font-bold">
+          <div className="w-10 h-10 border-2 border-border bg-foreground text-background flex items-center justify-center font-bold">
             <Zap className="w-5 h-5" />
           </div>
-          <h3 className="text-base font-black text-navy-900 group-hover:text-amber-600 transition-colors">
-            Pending Records ({stats.pendingRecordCount})
+          <h3 className="text-sm font-black uppercase text-foreground">
+            TRANSACTIONS ({stats.pendingRecordCount})
           </h3>
-          <p className="text-xs text-slate-500">Review transaction records and their status</p>
+          <p className="text-xs text-foreground-muted">Audit transaction ledger status and signatures</p>
         </Link>
 
         <Link
           href="/merchant/reports"
-          className="bg-emerald-50/70 border border-emerald-200 p-5 rounded-2xl hover:border-emerald-400 hover:shadow-md transition-all group space-y-2 min-w-0"
+          className="neo-box-interactive p-5 group space-y-2 block"
         >
-          <div className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center font-bold">
+          <div className="w-10 h-10 border-2 border-border bg-foreground text-background flex items-center justify-center font-bold">
             <BarChart3 className="w-5 h-5" />
           </div>
-          <h3 className="text-base font-black text-navy-900 group-hover:text-emerald-600 transition-colors">
-            Transaction Reports
+          <h3 className="text-sm font-black uppercase text-foreground">
+            AUDIT REPORTS
           </h3>
-          <p className="text-xs text-slate-500">Analytics charts & payment distribution</p>
+          <p className="text-xs text-foreground-muted">Sales distribution analytics & ledger exports</p>
         </Link>
       </div>
 
-      {/* Recent Transactions */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 space-y-4 shadow-sm">
-        <div className="flex items-center justify-between">
+      {/* Recent Ledger Transactions */}
+      <div className="neo-box p-6 space-y-4">
+        <div className="flex items-center justify-between border-b-2 border-border pb-3">
           <div>
-            <h3 className="text-lg font-black text-navy-900">Recent Transactions</h3>
-            <p className="text-xs text-slate-400">Latest transaction records; pending entries are not verified payments</p>
+            <h3 className="text-base font-black uppercase text-foreground">RECENT LEDGER TRANSACTIONS</h3>
+            <p className="text-xs text-foreground-muted">Real-time local event stream</p>
           </div>
           <Link
             href="/merchant/transactions"
-            className="text-xs font-extrabold text-brand-blue hover:text-brand-darkBlue flex items-center gap-1"
+            className="text-xs font-bold underline text-foreground hover:opacity-80 flex items-center gap-1"
           >
-            <span>View All</span>
+            <span>VIEW ALL</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
         {recentTxns.length === 0 ? (
-          <div className="py-8 text-center text-xs font-bold text-slate-400">No transactions recorded yet.</div>
+          <div className="py-8 text-center text-xs text-foreground-muted font-bold uppercase">
+            NO TRANSACTIONS RECORDED YET.
+          </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y-2 divide-border">
             {recentTxns.map((t) => (
               <div key={t.transactionId} className="py-3.5 flex items-center justify-between text-xs">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-navy-900">{t.transactionId}</span>
-                    <span
-                      className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md ${
-                        t.type === 'BILL_QR' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-700'
-                      }`}
-                    >
+                    <span className="font-black text-foreground">{t.transactionId}</span>
+                    <span className="text-[9px] font-bold border border-border px-1.5 py-0.2 bg-surface text-foreground">
                       {t.type}
                     </span>
-                    <span
-                      className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md ${transactionStatusTone(
-                        t.status
-                      )}`}
-                    >
+                    <span className={`text-[9px] font-black px-2 py-0.5 uppercase ${transactionStatusTone(t.status)}`}>
                       {transactionStatusLabel(t.status)}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400">
+
+                  <p className="text-[10px] text-foreground-muted mt-0.5">
                     {new Date(t.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                   </p>
                 </div>
-                <span className="text-base font-black text-navy-900">₹{t.amount.toFixed(2)}</span>
+                <span className="text-base font-black text-foreground">₹{t.amount.toFixed(2)}</span>
               </div>
             ))}
           </div>

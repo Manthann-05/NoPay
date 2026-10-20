@@ -7,7 +7,6 @@ import { QrCode, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 import { getLocalSession } from '@/offline/session';
 import { notifyAuthStateChanged } from '@/lib/auth/client';
 
-// Force dynamic rendering to avoid pre-rendering issues with client-side hooks
 export const dynamic = 'force-dynamic';
 
 export default function LoginPage() {
@@ -34,7 +33,7 @@ export default function LoginPage() {
           }
         }
       } catch {
-        // Fall back to the offline session below.
+        // Fall back to offline session
       }
 
       if (cancelled || isSubmittingRef.current) return;
@@ -69,11 +68,10 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || 'Login failed');
+        setError(data.error || 'Authentication failed');
         return;
       }
 
-      // Save session for offline mode
       const { user } = data;
       await (await import('@/offline/session')).saveLocalSession(
         user.userId,
@@ -95,50 +93,55 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center py-12 px-4">
-      <div className="w-full max-w-md bg-white p-8 rounded-3xl border border-slate-200 shadow-modal space-y-6">
+    <div className="min-h-[75vh] flex items-center justify-center py-12 px-4">
+      <div className="w-full max-w-md neo-box p-8 space-y-6">
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-brand-blue text-white flex items-center justify-center mx-auto shadow-md">
-            <QrCode className="w-7 h-7" />
+          <div className="w-12 h-12 border-2 border-border bg-foreground text-background flex items-center justify-center mx-auto shadow-[3px_3px_0px_0px_var(--border)]">
+            <QrCode className="w-6 h-6" />
           </div>
-          <h2 className="text-2xl font-black text-navy-900">Welcome Back</h2>
-          <p className="text-xs text-slate-500">Sign in to access your NoPay wallet or POS terminal</p>
+          <h2 className="text-2xl font-black uppercase text-foreground tracking-tight">TERMINAL ACCESS</h2>
+          <p className="text-xs font-mono text-foreground-muted">Sign in to authenticate session keys</p>
         </div>
 
         {error && (
-          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>{error}</span>
+          <div className="p-3 border-2 border-rose-500 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-mono font-bold flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(244,63,94,1)]">
+            <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+            <span>[AUTH REJECTED] {error}</span>
           </div>
         )}
 
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+            <label className="block text-xs font-mono font-bold text-foreground mb-1.5 uppercase">
+              EMAIL ADDRESS
+            </label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <Mail className="w-4 h-4 text-foreground-muted absolute left-3 top-3.5" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@example.com"
-                className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-blue focus:border-brand-blue outline-none transition-all"
+                placeholder="name@company.com"
+                className="neo-input pl-9 pr-3 py-2.5 text-xs"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Password</label>
+            <label className="block text-xs font-mono font-bold text-foreground mb-1.5 uppercase">
+              PASSWORD
+            </label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <Lock className="w-4 h-4 text-foreground-muted absolute left-3 top-3.5" />
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-blue focus:border-brand-blue outline-none transition-all"
+                placeholder="••••••••••••"
+                className="neo-input pl-9 pr-3 py-2.5 text-xs"
               />
             </div>
           </div>
@@ -146,17 +149,17 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-brand-blue hover:bg-brand-darkBlue text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-sm"
+            className="w-full neo-btn py-3 mt-2"
           >
-            {loading ? 'Authenticating...' : 'Sign In'}
+            {loading ? 'AUTHENTICATING...' : 'SIGN IN'}
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
-        <div className="text-center pt-4 border-t border-slate-100 text-xs text-slate-500">
-          Don't have an account?{' '}
-          <Link href="/register" className="font-bold text-brand-blue hover:underline">
-            Register now
+        <div className="text-center pt-4 border-t-2 border-border text-xs font-mono text-foreground-muted flex items-center justify-between">
+          <span>NO ACCOUNT?</span>
+          <Link href="/register" className="font-bold underline text-foreground hover:opacity-80">
+            REGISTER TERMINAL
           </Link>
         </div>
       </div>

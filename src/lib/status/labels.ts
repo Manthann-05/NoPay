@@ -27,20 +27,21 @@ export function transactionStatusTone(status: TransactionStatus | string): strin
   switch (status) {
     case 'CONFIRMED':
     case 'SYNCED':
-      return 'bg-emerald-100 text-emerald-800';
+      return 'border border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold';
     case 'PENDING_SYNC':
     case 'LOCAL_CREATED':
     case 'RETRY_PENDING':
-      return 'bg-amber-100 text-amber-900';
+      return 'border border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold';
     case 'SYNCING':
-      return 'bg-blue-100 text-blue-800';
+      return 'border border-border bg-foreground text-background font-bold';
     case 'REJECTED':
     case 'FAILED':
-      return 'bg-rose-100 text-rose-900';
+      return 'border border-rose-500 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold';
     default:
-      return 'bg-slate-200 text-slate-700';
+      return 'border border-border bg-surface text-foreground font-bold';
   }
 }
+
 
 export function isBillExpired(expiresAt?: string | Date | null): boolean {
   if (!expiresAt) return false;

@@ -1,9 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, ShieldCheck, Store } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
+import { useMounted } from '@/hooks/useMounted';
+
+export const dynamic = 'force-dynamic';
 
 interface MerchantOption {
   merchantId: string;
@@ -22,6 +25,7 @@ interface Mandate {
 }
 
 export default function CustomerAutoPayPage() {
+  const isMounted = useMounted();
   const router = useRouter();
   const [merchants, setMerchants] = useState<MerchantOption[]>([]);
   const [mandates, setMandates] = useState<Mandate[]>([]);
@@ -150,8 +154,8 @@ export default function CustomerAutoPayPage() {
               }
               setNotice(
                 verifyData.status === 'ACTIVE'
-                  ? 'UPI AutoPay mandate is active. Each eligible debit will be scheduled after provider notification.'
-                  : 'Authorization received. Razorpay is waiting for your bank to activate the mandate.'
+                  ? 'UPI AutoPay mandate is active.'
+                  : 'Authorization received. Bank is activating the mandate.'
               );
               await loadData();
             } catch (verifyError) {
@@ -191,7 +195,7 @@ export default function CustomerAutoPayPage() {
       }
       setNotice(
         data.status === 'CANCELLATION_PENDING'
-          ? 'Revocation requested with Razorpay. Pending charges are not started while cancellation is processing.'
+          ? 'Revocation requested with Razorpay.'
           : 'Mandate revoked.'
       );
       await loadData();
@@ -200,74 +204,78 @@ export default function CustomerAutoPayPage() {
     }
   };
 
+  if (!isMounted) {
+    return (
+      <div className="max-w-2xl mx-auto py-12 px-4 text-center font-mono">
+        <p className="text-xs font-black uppercase text-foreground">LOADING AUTOPAY...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-2xl mx-auto py-6 px-4 space-y-6">
+    <div className="max-w-2xl mx-auto py-6 px-4 space-y-6 font-mono">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
       <button
         onClick={() => router.push('/customer/profile')}
-        className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-navy-900"
+        className="inline-flex items-center gap-1.5 text-xs font-bold text-foreground hover:opacity-80 uppercase"
       >
         <ArrowLeft className="w-4 h-4" />
-        <span>Profile</span>
+        <span>BACK TO PROFILE</span>
       </button>
 
-      <header>
-        <h1 className="text-2xl font-black text-navy-900">Merchant AutoPay</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Authorize a separate UPI mandate for each merchant. Only merchant-issued bills already
-          recorded by NoPay can be considered; offline payment records alone never trigger a debit.
-        </p>
-        <p className="mt-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-950">
-          This feature is managed by your signed-in NoPay customer account. Razorpay securely
-          processes UPI mandate authorization and debits; you do not need a separate Razorpay
-          customer account. You approve the mandate in your UPI app and can review or revoke it here.
+      <header className="space-y-2">
+        <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">MERCHANT AUTOPAY</h1>
+        <p className="text-xs text-foreground-muted leading-relaxed">
+          Authorize a separate UPI mandate per merchant. Only verified bills recorded by NoPay can be considered; offline payment records alone never trigger a debit.
         </p>
       </header>
 
       {error && (
-        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-          {error}
+        <div role="alert" className="p-3.5 border-2 border-rose-500 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-bold shadow-[2px_2px_0px_0px_rgba(244,63,94,1)]">
+          [ERROR] {error}
         </div>
       )}
       {notice && (
-        <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-          {notice}
+        <div role="status" className="p-3.5 border-2 border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold shadow-[2px_2px_0px_0px_rgba(16,185,129,1)]">
+          [CONFIRMED] {notice}
         </div>
       )}
 
+
       {loading ? (
-        <p className="py-10 text-center text-sm font-semibold text-slate-500">Loading mandates...</p>
+        <p className="py-10 text-center text-xs font-black uppercase text-foreground-muted">LOADING MANDATES...</p>
       ) : (
         <>
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="rounded-xl bg-blue-50 p-2 text-blue-700">
+          <section className="neo-box p-6 space-y-5">
+            <div className="flex items-center gap-3 border-b-2 border-border pb-3">
+              <div className="border-2 border-border bg-foreground text-background p-2">
                 <ShieldCheck className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="font-bold text-navy-900">Authorize a merchant</h2>
-                <p className="text-xs text-slate-500">NoPay records your consent; approve the bank mandate in your UPI app.</p>
+                <h2 className="text-sm font-black uppercase text-foreground">AUTHORIZE MERCHANT</h2>
+                <p className="text-[11px] text-foreground-muted">Approve the bank mandate in your UPI app</p>
               </div>
             </div>
+
             {!enabled ? (
-              <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
-                Provider-backed AutoPay is not enabled for this NoPay environment.
+              <p className="border-2 border-border bg-background p-3 text-xs text-foreground font-bold uppercase">
+                UPI AutoPay is disabled for this environment.
               </p>
             ) : merchants.length === 0 ? (
-              <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
-                No merchants currently have an active, verified Razorpay payout account.
+              <p className="border-2 border-border bg-background p-3 text-xs text-foreground font-bold uppercase">
+                No merchants currently have an active payout account.
               </p>
             ) : (
               <form onSubmit={createMandate} className="space-y-4">
-                <label className="block space-y-1.5 text-sm font-semibold text-slate-700">
-                  Merchant
+                <label className="block space-y-1.5 text-xs font-bold text-foreground uppercase">
+                  MERCHANT
                   <select
                     value={selectedMerchant}
                     onChange={(event) => setSelectedMerchant(event.target.value)}
                     required
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
+                    className="neo-input px-3 py-2.5 text-xs uppercase"
                   >
-                    <option value="">Choose a merchant</option>
+                    <option value="">CHOOSE A MERCHANT</option>
                     {merchants.map((merchant) => (
                       <option key={merchant.merchantId} value={merchant.merchantId}>
                         {merchant.shopName} · {merchant.area}
@@ -276,8 +284,8 @@ export default function CustomerAutoPayPage() {
                   </select>
                 </label>
 
-                <label className="block space-y-1.5 text-sm font-semibold text-slate-700">
-                  Maximum amount per debit (₹)
+                <label className="block space-y-1.5 text-xs font-bold text-foreground uppercase">
+                  MAX DEBIT AMOUNT (₹)
                   <input
                     type="number"
                     min="1"
@@ -286,12 +294,12 @@ export default function CustomerAutoPayPage() {
                     value={maxAmount}
                     onChange={(event) => setMaxAmount(event.target.value)}
                     required
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                    className="neo-input px-3 py-2.5 text-xs"
                   />
                 </label>
 
-                <label className="block space-y-1.5 text-sm font-semibold text-slate-700">
-                  Mobile number for UPI mandate
+                <label className="block space-y-1.5 text-xs font-bold text-foreground uppercase">
+                  UPI MOBILE NUMBER
                   <input
                     type="tel"
                     autoComplete="tel"
@@ -299,66 +307,60 @@ export default function CustomerAutoPayPage() {
                     onChange={(event) => setContact(event.target.value)}
                     pattern="\+?[0-9]{8,15}"
                     required
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2.5"
+                    className="neo-input px-3 py-2.5 text-xs"
                   />
                 </label>
 
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
-                  By continuing, you authorize this merchant to collect a verified outstanding bill
-                  up to ₹{Number(maxAmount || 0).toFixed(2)} per debit while this mandate is active.
-                  Razorpay sends a pre-debit notification; the debit is scheduled only after its
-                  required notice period. This does not guarantee recovery and is not a substitute
-                  for checking whether a bill was actually paid. A one-time ₹1 authorization payment
-                  may be charged by Razorpay during mandate setup.
+                <div className="p-3 border-2 border-border bg-background text-[11px] leading-relaxed text-foreground-muted">
+                  By continuing, you authorize this merchant to collect verified outstanding bills up to ₹{Number(maxAmount || 0).toFixed(2)} per debit while this mandate is active.
                 </div>
-                <label className="flex items-start gap-2 text-xs leading-5 text-slate-700">
-                  <input name="consentAccepted" type="checkbox" required className="mt-1" />
-                  <span>
-                    I understand and authorize this merchant-specific UPI mandate, the per-debit
-                    limit above, and the required pre-debit notice.
-                  </span>
+
+                <label className="flex items-start gap-2 text-xs text-foreground font-bold">
+                  <input name="consentAccepted" type="checkbox" required className="mt-1 accent-foreground" />
+                  <span>I authorize this merchant-specific UPI mandate and per-debit limit.</span>
                 </label>
 
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full rounded-xl bg-brand-blue px-4 py-3 text-sm font-bold text-white disabled:opacity-60"
+                  className="w-full neo-btn py-3 text-xs"
                 >
-                  {submitting ? 'Waiting for authorization...' : 'Continue to secure UPI authorization'}
+                  {submitting ? 'WAITING FOR AUTHORIZATION...' : 'AUTHORIZE UPI MANDATE'}
                 </button>
               </form>
             )}
           </section>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-2">
-              <Store className="h-5 w-5 text-slate-500" />
-              <h2 className="font-bold text-navy-900">Your mandates</h2>
+          <section className="neo-box p-6 space-y-4">
+            <div className="flex items-center gap-2 border-b-2 border-border pb-3">
+              <Store className="h-5 w-5 text-foreground" />
+              <h2 className="text-sm font-black uppercase text-foreground">REGISTERED MANDATES</h2>
             </div>
+
             {mandates.length === 0 ? (
-              <p className="text-sm text-slate-500">No merchant mandates yet.</p>
+              <p className="text-xs font-bold uppercase text-foreground-muted">No merchant mandates configured yet.</p>
             ) : (
               <div className="space-y-3">
                 {mandates.map((mandate) => (
                   <article
                     key={mandate.id}
-                    className="flex flex-col gap-3 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
+                    className="p-4 border-2 border-border bg-background flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
                   >
                     <div>
-                      <h3 className="font-bold text-navy-900">{mandate.merchantName}</h3>
-                      <p className="text-xs text-slate-600">
-                        Up to ₹{mandate.maxAmount.toFixed(2)} per debit · {mandate.status.replaceAll('_', ' ')}
+                      <h3 className="font-black text-sm uppercase text-foreground">{mandate.merchantName}</h3>
+                      <p className="text-xs text-foreground-muted">
+                        UP TO ₹{mandate.maxAmount.toFixed(2)} // {mandate.status}
                       </p>
-                      <p className="text-[11px] text-slate-500">
-                        Expires {new Date(mandate.expiresAt).toLocaleDateString()}
+                      <p className="text-[10px] text-foreground-subtle mt-0.5">
+                        EXPIRES {new Date(mandate.expiresAt).toLocaleDateString()}
                       </p>
                     </div>
                     {mandate.status === 'ACTIVE' && (
                       <button
                         onClick={() => void revokeMandate(mandate)}
-                        className="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50"
+                        className="neo-btn-secondary py-1.5 px-3 text-xs"
                       >
-                        Revoke mandate
+                        REVOKE
                       </button>
                     )}
                   </article>

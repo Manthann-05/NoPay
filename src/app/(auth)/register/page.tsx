@@ -3,11 +3,10 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { QrCode, Lock, Mail, User, Store, ArrowRight, AlertCircle, MapPin } from 'lucide-react';
+import { QrCode, Lock, Mail, User, Store, ArrowRight, AlertCircle } from 'lucide-react';
 import { getLocalSession } from '@/offline/session';
 import { notifyAuthStateChanged } from '@/lib/auth/client';
 
-// Force dynamic rendering to avoid pre-rendering issues with client-side hooks
 export const dynamic = 'force-dynamic';
 
 export default function RegisterPage() {
@@ -39,7 +38,7 @@ export default function RegisterPage() {
           }
         }
       } catch {
-        // Fall back to the offline session below.
+        // Fall back to offline session
       }
 
       const session = await getLocalSession();
@@ -83,7 +82,6 @@ export default function RegisterPage() {
         return;
       }
 
-      // Automatically log them in by fetching their profile and saving to offline session
       try {
         const meRes = await fetch('/api/auth/me');
         if (meRes.ok) {
@@ -115,138 +113,139 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center py-12 px-4">
-      <div className="w-full max-w-lg bg-white p-8 rounded-3xl border border-slate-200 shadow-modal space-y-6">
+    <div className="min-h-[80vh] flex items-center justify-center py-12 px-4">
+      <div className="w-full max-w-lg neo-box p-8 space-y-6">
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-brand-blue text-white flex items-center justify-center mx-auto shadow-md">
-            <QrCode className="w-7 h-7" />
+          <div className="w-12 h-12 border-2 border-border bg-foreground text-background flex items-center justify-center mx-auto shadow-[3px_3px_0px_0px_var(--border)]">
+            <QrCode className="w-6 h-6" />
           </div>
-          <h2 className="text-2xl font-black text-navy-900">Create NoPay Account</h2>
-          <p className="text-xs text-slate-500">Choose your initial role to begin</p>
+          <h2 className="text-2xl font-black uppercase text-foreground tracking-tight">CREATE PROFILE</h2>
+          <p className="text-xs font-mono text-foreground-muted">Select role to initialize keys</p>
         </div>
 
         {error && (
-          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>{error}</span>
+          <div className="p-3 border-2 border-rose-500 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-mono font-bold flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(244,63,94,1)]">
+            <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+            <span>[REGISTRATION REJECTED] {error}</span>
           </div>
         )}
 
-        {/* Role Selector Tabs */}
-        <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl">
+
+        {/* Role Selector Blocks */}
+        <div className="grid grid-cols-2 gap-2 p-1 border-2 border-border bg-surface shadow-[3px_3px_0px_0px_var(--border)] font-mono">
           <button
             type="button"
             onClick={() => setInitialRole('CUSTOMER')}
-            className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            className={`py-2 px-3 text-xs font-bold uppercase transition-all flex items-center justify-center gap-2 ${
               initialRole === 'CUSTOMER'
-                ? 'bg-white text-brand-blue shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-foreground text-background'
+                : 'text-foreground hover:bg-surface-hover'
             }`}
           >
-            <User className="w-4 h-4" />
-            <span>Customer</span>
+            <User className="w-3.5 h-3.5" />
+            <span>CUSTOMER</span>
           </button>
           <button
             type="button"
             onClick={() => setInitialRole('MERCHANT')}
-            className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            className={`py-2 px-3 text-xs font-bold uppercase transition-all flex items-center justify-center gap-2 ${
               initialRole === 'MERCHANT'
-                ? 'bg-navy-900 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-foreground text-background'
+                : 'text-foreground hover:bg-surface-hover'
             }`}
           >
-            <Store className="w-4 h-4" />
-            <span>Merchant POS</span>
+            <Store className="w-3.5 h-3.5" />
+            <span>MERCHANT POS</span>
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
+            <label className="block text-xs font-mono font-bold text-foreground mb-1.5 uppercase">FULL NAME</label>
             <div className="relative">
-              <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <User className="w-4 h-4 text-foreground-muted absolute left-3 top-3.5" />
               <input
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Manthan Kadu"
-                className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none"
+                className="neo-input pl-9 pr-3 py-2.5 text-xs"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+            <label className="block text-xs font-mono font-bold text-foreground mb-1.5 uppercase">EMAIL ADDRESS</label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <Mail className="w-4 h-4 text-foreground-muted absolute left-3 top-3.5" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="manthan@example.com"
-                className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none"
+                placeholder="manthan@company.com"
+                className="neo-input pl-9 pr-3 py-2.5 text-xs"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Password</label>
+            <label className="block text-xs font-mono font-bold text-foreground mb-1.5 uppercase">PASSWORD</label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <Lock className="w-4 h-4 text-foreground-muted absolute left-3 top-3.5" />
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none"
+                placeholder="••••••••••••"
+                className="neo-input pl-9 pr-3 py-2.5 text-xs"
               />
             </div>
           </div>
 
           {/* Additional Merchant Fields */}
           {initialRole === 'MERCHANT' && (
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-              <div className="text-xs font-bold text-navy-900 flex items-center gap-1.5">
-                <Store className="w-4 h-4 text-brand-blue" />
-                <span>Shop & Store Details</span>
+            <div className="p-4 border-2 border-border bg-background space-y-3 font-mono">
+              <div className="text-xs font-black uppercase text-foreground flex items-center gap-1.5">
+                <Store className="w-4 h-4" />
+                <span>SHOP & TERMINAL CONFIGURATION</span>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">Shop Name</label>
+                <label className="block text-[10px] font-bold text-foreground-muted mb-1 uppercase">SHOP NAME</label>
                 <input
                   type="text"
                   required
                   value={shopName}
                   onChange={(e) => setShopName(e.target.value)}
-                  placeholder="ABC General Store"
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:border-brand-blue"
+                  placeholder="Apex Provisions"
+                  className="neo-input px-3 py-2 text-xs"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Address</label>
+                  <label className="block text-[10px] font-bold text-foreground-muted mb-1 uppercase">ADDRESS</label>
                   <input
                     type="text"
                     required
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Shop #12, Main Street"
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:border-brand-blue"
+                    placeholder="Terminal #104"
+                    className="neo-input px-3 py-2 text-xs"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Area / Locality</label>
+                  <label className="block text-[10px] font-bold text-foreground-muted mb-1 uppercase">LOCALITY</label>
                   <input
                     type="text"
                     required
                     value={area}
                     onChange={(e) => setArea(e.target.value)}
-                    placeholder="Downtown"
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:border-brand-blue"
+                    placeholder="Downtown Hub"
+                    className="neo-input px-3 py-2 text-xs"
                   />
                 </div>
               </div>
@@ -256,17 +255,17 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-brand-blue hover:bg-brand-darkBlue text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-sm"
+            className="w-full neo-btn py-3 mt-2"
           >
-            {loading ? 'Creating Account...' : 'Register Account'}
+            {loading ? 'CREATING CREDENTIALS...' : 'CREATE ACCOUNT'}
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
-        <div className="text-center pt-4 border-t border-slate-100 text-xs text-slate-500">
-          Already have an account?{' '}
-          <Link href="/login" className="font-bold text-brand-blue hover:underline">
-            Sign in
+        <div className="text-center pt-4 border-t-2 border-border text-xs font-mono text-foreground-muted flex items-center justify-between">
+          <span>ALREADY REGISTERED?</span>
+          <Link href="/login" className="font-bold underline text-foreground hover:opacity-80">
+            SIGN IN
           </Link>
         </div>
       </div>

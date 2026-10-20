@@ -21,6 +21,7 @@ import {
   User as UserIcon,
   Store,
 } from 'lucide-react';
+import { ThemeToggle } from './ThemeToggle';
 
 interface NavbarUser {
   name: string;
@@ -69,7 +70,6 @@ export function Navbar() {
           }
         }
         
-        // Fallback to local session if offline or API failed
         const session = await getLocalSession();
         if (session) {
           setUser({
@@ -84,7 +84,6 @@ export function Navbar() {
         }
       } catch (err) {
         if (controller.signal.aborted) return;
-        console.error('Failed to load user', err);
         const session = await getLocalSession();
         if (session && !controller.signal.aborted) {
           setUser({
@@ -141,57 +140,56 @@ export function Navbar() {
   };
 
   const customerNav = [
-    { label: 'Dashboard', href: '/customer/dashboard', icon: LayoutDashboard },
-    { label: 'Scan QR', href: '/customer/scan', icon: QrCode },
-    { label: 'Transactions', href: '/customer/transactions', icon: History },
-    { label: 'Profile', href: '/customer/profile', icon: Settings },
+    { label: 'DASHBOARD', href: '/customer/dashboard', icon: LayoutDashboard },
+    { label: 'SCAN QR', href: '/customer/scan', icon: QrCode },
+    { label: 'TRANSACTIONS', href: '/customer/transactions', icon: History },
+    { label: 'PROFILE', href: '/customer/profile', icon: Settings },
   ];
 
   const merchantNav = [
-    { label: 'Dashboard', href: '/merchant/dashboard', icon: LayoutDashboard },
-    { label: 'Billing / POS', href: '/merchant/billing', icon: ShoppingCart },
-    { label: 'Products', href: '/merchant/products', icon: Package },
-    { label: 'Static QR', href: '/merchant/static-qr', icon: QrCode },
-    { label: 'Transactions', href: '/merchant/transactions', icon: History },
-    { label: 'Reports', href: '/merchant/reports', icon: BarChart3 },
-    { label: 'Profile', href: '/merchant/profile', icon: Settings },
+    { label: 'DASHBOARD', href: '/merchant/dashboard', icon: LayoutDashboard },
+    { label: 'POS BILLING', href: '/merchant/billing', icon: ShoppingCart },
+    { label: 'PRODUCTS', href: '/merchant/products', icon: Package },
+    { label: 'STATIC QR', href: '/merchant/static-qr', icon: QrCode },
+    { label: 'TRANSACTIONS', href: '/merchant/transactions', icon: History },
+    { label: 'REPORTS', href: '/merchant/reports', icon: BarChart3 },
+    { label: 'PROFILE', href: '/merchant/profile', icon: Settings },
   ];
 
   const currentNavItems = activeRole === 'MERCHANT' ? merchantNav : customerNav;
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+    <header className="sticky top-0 z-40 bg-surface border-b-2 border-border shadow-[0px_3px_0px_0px_var(--border)] transition-colors duration-150">
       <div className="w-full px-4 sm:px-6">
         <div className="flex items-center justify-between h-16 gap-3">
-          {/* Logo & Shop Name */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          {/* Logo & Shop Tag */}
+          <div className="flex items-center gap-3 shrink-0">
             <Link href="/" className="flex items-center gap-2 group">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-navy-900 to-brand-blue flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
+              <div className="w-9 h-9 border-2 border-border bg-foreground text-background flex items-center justify-center font-black shadow-[2px_2px_0px_0px_var(--border)] group-hover:translate-x-[-1px] group-hover:translate-y-[-1px] transition-transform">
                 <QrCode className="w-5 h-5" />
               </div>
-              <div>
-                <span className="text-lg font-black tracking-tight text-navy-900 block leading-tight">
-                  No<span className="text-brand-blue">Pay</span>
+              <div className="leading-none">
+                <span className="text-lg font-black tracking-tighter text-foreground block uppercase">
+                  NO<span className="underline decoration-2 underline-offset-2">PAY</span>
                 </span>
-                <span className="text-[9px] font-semibold tracking-wider text-slate-500 uppercase block">
-                  Offline POS
+                <span className="text-[9px] font-mono font-bold tracking-widest text-foreground-muted block mt-0.5">
+                  OFFLINE POS
                 </span>
               </div>
             </Link>
 
-            {/* Merchant Shop Tag */}
             {activeRole === 'MERCHANT' && user?.merchantProfile?.shopName && (
-              <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 bg-navy-50 text-navy-900 border border-navy-200 rounded-lg text-xs font-medium shrink-0">
-                <Store className="w-3.5 h-3.5 text-brand-blue shrink-0" />
-                <span className="font-bold truncate max-w-[120px]">
+              <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 border-2 border-border bg-surface text-foreground font-mono text-xs font-bold shadow-[2px_2px_0px_0px_var(--border)] shrink-0">
+                <Store className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate max-w-[120px] uppercase">
                   {user.merchantProfile.shopName}
                 </span>
               </div>
             )}
           </div>
 
-          {/* Desktop Navigation Links */}
-          <nav className="flex min-w-0 items-center justify-center gap-1 overflow-x-auto scrollbar-none py-1">
+          {/* Desktop Navigation */}
+          <nav className="flex min-w-0 items-center justify-center gap-1.5 overflow-x-auto scrollbar-none py-1">
             {user && currentNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href || Boolean(pathname?.startsWith(item.href + '/'));
@@ -205,22 +203,25 @@ export function Navbar() {
                       window.location.assign(item.href);
                     }
                   }}
-                  className={`flex shrink-0 items-center rounded-lg py-1.5 px-2 text-xs font-medium transition-all gap-1.5 ${
+                  className={`flex shrink-0 items-center py-1.5 px-2.5 text-xs font-mono font-bold border-2 transition-all gap-1.5 ${
                     isActive
-                      ? 'bg-blue-50 text-brand-blue font-bold shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                      ? 'bg-foreground text-background border-border shadow-[2px_2px_0px_0px_var(--border)] translate-x-[-1px] translate-y-[-1px]'
+                      : 'border-transparent text-foreground hover:border-border hover:bg-surface-hover'
                   }`}
                 >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-brand-blue' : 'text-slate-400'}`} />
+                  <Icon className="w-3.5 h-3.5" />
                   <span className="whitespace-nowrap">{item.label}</span>
                 </Link>
               );
             })}
           </nav>
 
-          {/* Right Header Actions (Offline Badge, Role Switcher, Auth Buttons) */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          {/* Right Header Actions */}
+          <div className="flex items-center gap-2 shrink-0">
             <OfflineBadge />
+
+            {/* Global Theme Toggle */}
+            <ThemeToggle compact={true} />
 
             {!isLoading && (
               user ? (
@@ -236,20 +237,20 @@ export function Navbar() {
                     />
                   </div>
 
-                  <div className="relative flex items-center border-l border-slate-200 gap-2 pl-2.5">
-                    <div className="hidden xl:flex flex-col text-right">
-                      <span className="text-xs font-bold text-slate-800 leading-tight">
+                  <div className="flex items-center border-l-2 border-border gap-2 pl-2">
+                    <div className="hidden xl:flex flex-col text-right font-mono">
+                      <span className="text-xs font-black text-foreground leading-tight truncate max-w-[100px]">
                         {user.name}
                       </span>
-                      <span className="text-[10px] text-slate-500">{user.email}</span>
+                      <span className="text-[9px] text-foreground-muted truncate max-w-[100px]">{user.email}</span>
                     </div>
 
                     <button
                       onClick={handleLogout}
                       title="Logout"
-                      className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                      className="p-1.5 border-2 border-border bg-surface text-foreground hover:bg-foreground hover:text-background transition-colors shadow-[2px_2px_0px_0px_var(--border)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
                     >
-                      <LogOut className="w-4 h-4" />
+                      <LogOut className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </>
@@ -257,20 +258,19 @@ export function Navbar() {
                 <div className="flex items-center gap-2">
                   <Link
                     href="/login"
-                    className="px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-navy-900 transition-colors"
+                    className="px-3 py-2 text-xs font-mono font-bold text-foreground border-2 border-transparent hover:border-border hover:bg-surface-hover transition-all"
                   >
-                    Sign In
+                    SIGN IN
                   </Link>
                   <Link
                     href="/register"
-                    className="px-4 py-2 text-xs font-bold text-white bg-brand-blue hover:bg-brand-darkBlue rounded-xl shadow-sm transition-all"
+                    className="px-3.5 py-2 text-xs font-mono font-black text-background bg-foreground border-2 border-border shadow-[2px_2px_0px_0px_var(--border)] hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all"
                   >
-                    Get Started
+                    REGISTER
                   </Link>
                 </div>
               )
             )}
-
           </div>
         </div>
       </div>

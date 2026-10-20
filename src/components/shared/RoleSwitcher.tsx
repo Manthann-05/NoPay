@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserRole } from '@/types';
 import { notifyAuthStateChanged } from '@/lib/auth/client';
-import { Store, Smartphone, ArrowRightLeft, PlusCircle } from 'lucide-react';
+import { Store, Smartphone } from 'lucide-react';
 
 interface RoleSwitcherProps {
   currentRole: UserRole;
@@ -30,7 +30,6 @@ export function RoleSwitcher({ currentRole, roles, hasMerchantProfile, onRoleCha
 
     setLoading(true);
     try {
-      // 1. Always update local session in Dexie (works offline)
       try {
         const { updateLocalActiveRole } = await import('@/offline/session');
         await updateLocalActiveRole(targetRole);
@@ -38,7 +37,6 @@ export function RoleSwitcher({ currentRole, roles, hasMerchantProfile, onRoleCha
         console.warn('Could not update local session role:', e);
       }
 
-      // 2. If online, sync to server
       if (typeof navigator !== 'undefined' && navigator.onLine) {
         try {
           await fetch('/api/auth/me', {
@@ -67,40 +65,34 @@ export function RoleSwitcher({ currentRole, roles, hasMerchantProfile, onRoleCha
   };
 
   return (
-    <div className={`flex items-center bg-slate-100 rounded-xl border border-slate-200 shadow-inner ${
-      compact ? 'p-0.5' : 'p-1'
-    }`}>
+    <div className="flex items-center border-2 border-border bg-surface shadow-[2px_2px_0px_0px_var(--border)] p-0.5 font-mono">
       <button
         onClick={() => switchRole('CUSTOMER')}
         disabled={loading}
-        className={`flex items-center rounded-lg font-semibold transition-all ${
-          compact ? 'gap-1 px-2 py-1 text-[11px]' : 'gap-1.5 px-3 py-1.5 text-xs'
-        } ${
+        className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold uppercase transition-all ${
           currentRole === 'CUSTOMER'
-            ? 'bg-white text-blue-700 shadow-sm border border-slate-200'
-            : 'text-slate-600 hover:text-slate-900'
+            ? 'bg-foreground text-background shadow-[1px_1px_0px_0px_var(--border)]'
+            : 'text-foreground hover:bg-surface-hover'
         }`}
       >
         <Smartphone className="w-3.5 h-3.5" />
-        <span>Customer</span>
+        <span>CUSTOMER</span>
       </button>
 
       <button
         onClick={() => switchRole('MERCHANT')}
         disabled={loading}
-        className={`flex items-center rounded-lg font-semibold transition-all ${
-          compact ? 'gap-1 px-2 py-1 text-[11px]' : 'gap-1.5 px-3 py-1.5 text-xs'
-        } ${
+        className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold uppercase transition-all ${
           currentRole === 'MERCHANT'
-            ? 'bg-navy-900 text-white shadow-sm'
-            : 'text-slate-600 hover:text-slate-900'
+            ? 'bg-foreground text-background shadow-[1px_1px_0px_0px_var(--border)]'
+            : 'text-foreground hover:bg-surface-hover'
         }`}
       >
         <Store className="w-3.5 h-3.5" />
-        <span>Merchant</span>
+        <span>MERCHANT</span>
         {!hasMerchantRole && (
-          <span className="ml-1 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">
-            + Setup
+          <span className="ml-0.5 text-[8px] border border-border bg-background text-foreground px-1 py-0.2 font-black">
+            +
           </span>
         )}
       </button>

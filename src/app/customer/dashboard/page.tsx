@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { QrCode, History, RefreshCw, Smartphone, Store, ShieldCheck, ArrowRight, Zap, CheckCircle2, Clock, CreditCard } from 'lucide-react';
+import { QrCode, History, Store, ArrowRight, Zap, Clock, CreditCard } from 'lucide-react';
 import { QrScannerModal } from '@/components/qr/QrScannerModal';
 import { getAllLocalTransactions } from '@/offline/queue';
 import { ScannedQrResult } from '@/lib/qr/payload';
@@ -12,7 +12,6 @@ import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labe
 import { Transaction } from '@/types';
 import { useMounted } from '@/hooks/useMounted';
 
-// Force dynamic rendering to avoid pre-rendering issues with client-side hooks
 export const dynamic = 'force-dynamic';
 
 export default function CustomerDashboardPage() {
@@ -26,14 +25,12 @@ export default function CustomerDashboardPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        // 1. First load from local session (works completely offline)
         const { getLocalSession } = await import('@/offline/session');
         const session = await getLocalSession();
         if (session) {
           setUser({ name: session.name, email: session.email });
         }
 
-        // 2. If online, optionally sync profile data from API
         if (typeof navigator !== 'undefined' && navigator.onLine) {
           try {
             const res = await fetch('/api/auth/me');
@@ -44,11 +41,10 @@ export default function CustomerDashboardPage() {
               }
             }
           } catch (e) {
-            // Ignore network errors when falling back
+            // Ignore offline fallback
           }
         }
 
-        // 3. Load local transactions from Dexie
         const localData = await getAllLocalTransactions();
         setRecentTxns(localData.slice(0, 5));
       } catch (err) {
@@ -75,110 +71,110 @@ export default function CustomerDashboardPage() {
   };
 
   return (
-    <div className="max-w-xl mx-auto space-y-6 pb-12">
+    <div className="max-w-xl mx-auto space-y-6 pb-12 font-mono">
       {/* Top Welcome Banner */}
-      <div className="bg-gradient-to-br from-navy-900 via-navy-800 to-slate-900 text-white p-6 rounded-3xl shadow-card space-y-3">
+      <div className="neo-box p-6 space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-brand-accent tracking-wider uppercase">
-            NoPay Customer Portal
+          <span className="text-[10px] font-black uppercase tracking-wider text-foreground">
+            CUSTOMER WALLET // PROTOCOL
           </span>
-          <div className="flex items-center gap-1 text-[11px] bg-white/10 px-2.5 py-0.5 rounded-full font-semibold">
-            <Zap className="w-3 h-3 text-emerald-400" />
-            <span>Resilient Offline Mode</span>
+          <div className="flex items-center gap-1.5 text-[10px] px-2 py-0.5 border border-border bg-background font-bold text-foreground">
+            <span className="w-1.5 h-1.5 bg-foreground inline-block"></span>
+            <span>ENGINE: ACTIVE</span>
           </div>
         </div>
 
-        <h1 className="text-2xl font-black tracking-tight">
-          Hello, {user ? user.name : 'Customer'} 👋
-        </h1>
-        <p className="text-xs text-slate-300">
-          Scan any NoPay Merchant or Bill QR to make a instant payment online or save offline.
-        </p>
+        <div className="space-y-1">
+          <h1 className="text-2xl font-black uppercase text-foreground tracking-tight">
+            HELLO, {user ? user.name : 'CUSTOMER'}
+          </h1>
+          <p className="text-xs text-foreground-muted">
+            Scan NoPay merchant barcodes to execute offline transactions with local cryptographic verification.
+          </p>
+        </div>
       </div>
 
-      {/* DOMINANT ACTION BUTTON: SCAN QR */}
-      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-card text-center space-y-4">
-        <div className="w-16 h-16 bg-blue-50 text-brand-blue rounded-2xl flex items-center justify-center mx-auto shadow-inner">
-          <QrCode className="w-9 h-9" />
+      {/* Dominant Scan Button */}
+      <div className="neo-box p-6 text-center space-y-4">
+        <div className="w-16 h-16 border-2 border-border bg-foreground text-background flex items-center justify-center mx-auto shadow-[3px_3px_0px_0px_var(--border)]">
+          <QrCode className="w-8 h-8" />
         </div>
 
         <div>
-          <h2 className="text-xl font-black text-navy-900">Scan QR</h2>
-          <p className="text-xs text-slate-500 mt-1">
-            Scan a Merchant QR or Bill QR
+          <h2 className="text-lg font-black uppercase text-foreground">SCAN PAYLOAD // QR</h2>
+          <p className="text-xs text-foreground-muted mt-0.5">
+            Decodes offline bill vouchers directly via camera
           </p>
         </div>
 
         <button
           onClick={() => setScannerOpen(true)}
-          className="w-full py-4 bg-brand-blue hover:bg-brand-darkBlue text-white font-extrabold text-base rounded-2xl shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
+          className="w-full neo-btn py-3.5 text-xs"
         >
-          <QrCode className="w-5 h-5" />
-          <span>Open Camera</span>
+          <QrCode className="w-4 h-4" />
+          <span>ACTIVATE CAMERA SCANNER</span>
         </button>
       </div>
 
+      {/* AutoPay Mandate Navigation Link */}
       <Link
         href="/customer/autopay"
-        className="flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-left transition-colors hover:border-brand-blue"
+        className="neo-box p-4 flex items-center gap-3 hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all block"
       >
-        <span className="rounded-xl bg-white p-2 text-blue-700">
+        <span className="border-2 border-border bg-foreground text-background p-2">
           <CreditCard className="h-5 w-5" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-bold text-navy-900">Manage merchant AutoPay</span>
-          <span className="block text-xs text-slate-600">
-            Set per-merchant limits, review consent, or revoke a mandate
+          <span className="block text-xs font-black uppercase text-foreground">MANAGE AUTOPAY MANDATES</span>
+          <span className="block text-[11px] text-foreground-muted">
+            Configure merchant permissions, debit caps, and revocation
           </span>
         </span>
-        <ArrowRight className="h-4 w-4 shrink-0 text-blue-700" />
+        <ArrowRight className="h-4 w-4 shrink-0 text-foreground" />
       </Link>
 
       {/* Recent Activity List */}
-      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-card space-y-4">
-        <div className="flex items-center justify-between">
+      <div className="neo-box p-6 space-y-4">
+        <div className="flex items-center justify-between border-b-2 border-border pb-3">
           <div className="flex items-center gap-2">
-            <History className="w-4 h-4 text-brand-blue" />
-            <h3 className="font-bold text-sm text-navy-900">Recent Transactions</h3>
+            <History className="w-4 h-4" />
+            <h3 className="font-black uppercase text-xs text-foreground">RECENT LEDGER ENTRIES</h3>
           </div>
           <Link
             href="/customer/transactions"
-            className="text-xs font-bold text-brand-blue hover:underline flex items-center gap-1"
+            className="text-xs font-bold underline text-foreground hover:opacity-80 flex items-center gap-1"
           >
-            <span>View All</span>
+            <span>VIEW ALL</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
         {recentTxns.length === 0 ? (
-          <div className="text-center py-8 px-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-            <Clock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-            <p className="text-xs text-slate-500 font-medium">No recent transactions yet.</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Scan a merchant QR to test a transaction.</p>
+          <div className="text-center py-8 px-4 border-2 border-dashed border-border bg-background">
+            <Clock className="w-6 h-6 text-foreground-muted mx-auto mb-2" />
+            <p className="text-xs text-foreground-muted font-bold uppercase">NO LEDGER RECORDS YET</p>
+            <p className="text-[10px] text-foreground-subtle mt-0.5">Scan a merchant barcode to record a transaction.</p>
           </div>
         ) : (
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {recentTxns.map((txn) => (
               <div
                 key={txn.transactionId}
-                className="flex items-center justify-between p-3.5 bg-slate-50 hover:bg-slate-100 rounded-2xl border border-slate-200 transition-colors"
+                className="flex items-center justify-between p-3 border-2 border-border bg-background"
               >
                 <div>
-                  <div className="text-xs font-bold text-navy-900">{txn.merchantName}</div>
-                  <div className="text-[10px] text-slate-500 font-mono">
-                    {txn.transactionId} • {isMounted ? new Date(txn.createdAt).toLocaleDateString() : '...'}
+                  <div className="text-xs font-black uppercase text-foreground">{txn.merchantName}</div>
+                  <div className="text-[10px] text-foreground-muted">
+                    {txn.transactionId} // {isMounted ? new Date(txn.createdAt).toLocaleDateString() : '...'}
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-black text-navy-900">₹{txn.amount}</div>
-                  <span
-                    className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${transactionStatusTone(
-                      txn.status
-                    )}`}
-                  >
+                  <div className="text-sm font-black text-foreground">₹{txn.amount}</div>
+                  <span className={`inline-block text-[9px] font-black px-2 py-0.5 uppercase mt-0.5 ${transactionStatusTone(txn.status)}`}>
                     {transactionStatusLabel(txn.status)}
                   </span>
                 </div>
+
               </div>
             ))}
           </div>
@@ -186,20 +182,20 @@ export default function CustomerDashboardPage() {
       </div>
 
       {/* Enable Merchant Mode Promotion */}
-      <div className="p-5 bg-navy-900 text-white rounded-3xl flex items-center justify-between shadow-md">
+      <div className="neo-box p-5 flex items-center justify-between">
         <div className="space-y-1">
-          <div className="text-xs font-bold text-brand-accent flex items-center gap-1">
+          <div className="text-[10px] font-black uppercase text-foreground-muted flex items-center gap-1">
             <Store className="w-3.5 h-3.5" />
-            <span>Own a Store or Shop?</span>
+            <span>COMMERCE PORTAL</span>
           </div>
-          <div className="text-sm font-black">Enable Merchant POS Mode</div>
-          <div className="text-[11px] text-slate-300">Accept QR payments & manage inventory</div>
+          <div className="text-sm font-black uppercase text-foreground">ENABLE MERCHANT POS MODE</div>
+          <div className="text-[11px] text-foreground-muted">Generate instant QR bills, track inventory offline</div>
         </div>
         <Link
           href="/merchant-setup"
-          className="px-4 py-2 bg-brand-blue hover:bg-brand-darkBlue text-white font-bold text-xs rounded-xl transition-all shrink-0"
+          className="neo-btn py-2 px-3 text-xs"
         >
-          Enable Now
+          ENABLE NOW
         </Link>
       </div>
 
