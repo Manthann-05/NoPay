@@ -189,7 +189,8 @@ export function Navbar() {
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="flex min-w-0 items-center justify-center gap-1.5 overflow-x-auto scrollbar-none py-1">
+          {activeRole !== 'MERCHANT' && (
+          <nav aria-label="Customer navigation" className="flex min-w-0 items-center justify-center gap-1.5 overflow-x-auto scrollbar-none py-1">
             {user && currentNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href || Boolean(pathname?.startsWith(item.href + '/'));
@@ -215,6 +216,7 @@ export function Navbar() {
               );
             })}
           </nav>
+          )}
 
           {/* Right Header Actions */}
           <div className="flex items-center gap-2 shrink-0">
@@ -274,6 +276,39 @@ export function Navbar() {
           </div>
         </div>
       </div>
+      {activeRole === 'MERCHANT' && user && (
+        <div className="border-t border-border/70 bg-surface">
+          <nav
+            aria-label="Merchant navigation"
+            className="mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto scrollbar-none p-4 sm:px-6 lg:px-8 lg:justify-center"
+          >
+            {merchantNav.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href || Boolean(pathname?.startsWith(item.href + '/'));
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={(event) => {
+                    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+                      event.preventDefault();
+                      window.location.assign(item.href);
+                    }
+                  }}
+                  className={`flex shrink-0 items-center gap-2 border-2 px-3 py-2 text-[11px] font-mono font-bold transition-all ${
+                    isActive
+                      ? 'border-border bg-foreground text-background shadow-[2px_2px_0px_0px_var(--border)]'
+                      : 'border-transparent text-foreground hover:border-border hover:bg-surface-hover'
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span className="whitespace-nowrap">{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+      )}
     </header>
   );
 }

@@ -426,7 +426,7 @@ export default function MerchantPosBillingPage() {
         </div>
 
         {/* RIGHT COLUMN: Live Active POS Cart */}
-        <div className="w-full lg:w-96 bg-white rounded-3xl border border-slate-200 shadow-card p-6 space-y-6 shrink-0 sticky top-20">
+        <div className="w-full lg:w-96 bg-white rounded-3xl border border-slate-200 shadow-card p-6 space-y-6 shrink-0 sticky top-32">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div className="flex items-center gap-2">
               <ShoppingCart className="w-5 h-5 text-brand-blue" />
