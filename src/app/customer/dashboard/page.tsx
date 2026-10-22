@@ -120,43 +120,62 @@ export default function CustomerDashboardPage() {
 
       {/* Dominant Scan Button */}
       <div className="grid items-start gap-6 lg:grid-cols-2">
-      <div className="neo-box p-6 text-center space-y-4">
-        <div className="w-16 h-16 border-2 border-border bg-foreground text-background flex items-center justify-center mx-auto shadow-[3px_3px_0px_0px_var(--border)]">
-          <QrCode className="w-8 h-8" />
+      <div className="flex flex-col gap-6">
+        <div className="neo-box p-6 text-center space-y-4">
+          <div className="w-16 h-16 border-2 border-border bg-foreground text-background flex items-center justify-center mx-auto shadow-[3px_3px_0px_0px_var(--border)]">
+            <QrCode className="w-8 h-8" />
+          </div>
+
+          <div>
+            <h2 className="text-lg font-black uppercase text-foreground">SCAN PAYLOAD // QR</h2>
+            <p className="text-xs text-foreground-muted mt-0.5">
+              Decodes offline bill vouchers directly via camera
+            </p>
+          </div>
+
+          <button
+            onClick={() => setScannerOpen(true)}
+            className="w-full neo-btn py-3.5 text-xs"
+          >
+            <QrCode className="w-4 h-4" />
+            <span>ACTIVATE CAMERA SCANNER</span>
+          </button>
         </div>
 
-        <div>
-          <h2 className="text-lg font-black uppercase text-foreground">SCAN PAYLOAD // QR</h2>
-          <p className="text-xs text-foreground-muted mt-0.5">
-            Decodes offline bill vouchers directly via camera
-          </p>
-        </div>
-
-        <button
-          onClick={() => setScannerOpen(true)}
-          className="w-full neo-btn py-3.5 text-xs"
+        {/* AutoPay Mandate Navigation Link */}
+        <Link
+          href="/customer/autopay"
+          className="neo-box p-4 flex items-center gap-3 hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all block lg:col-start-1"
         >
-          <QrCode className="w-4 h-4" />
-          <span>ACTIVATE CAMERA SCANNER</span>
-        </button>
-      </div>
-
-      {/* AutoPay Mandate Navigation Link */}
-      <Link
-        href="/customer/autopay"
-        className="neo-box p-4 flex items-center gap-3 hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all block lg:col-start-1"
-      >
-        <span className="border-2 border-border bg-foreground text-background p-2">
-          <CreditCard className="h-5 w-5" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-xs font-black uppercase text-foreground">MANAGE AUTOPAY MANDATES</span>
-          <span className="block text-[11px] text-foreground-muted">
-            Configure merchant permissions, debit caps, and revocation
+          <span className="border-2 border-border bg-foreground text-background p-2">
+            <CreditCard className="h-5 w-5" />
           </span>
-        </span>
-        <ArrowRight className="h-4 w-4 shrink-0 text-foreground" />
-      </Link>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-black uppercase text-foreground">MANAGE AUTOPAY MANDATES</span>
+            <span className="block text-[11px] text-foreground-muted">
+              Configure merchant permissions, debit caps, and revocation
+            </span>
+          </span>
+          <ArrowRight className="h-4 w-4 shrink-0 text-foreground" />
+        </Link>
+
+        <div className="neo-box p-5 flex items-center justify-between lg:col-start-1">
+          <div className="space-y-1">
+            <div className="text-[10px] font-black uppercase text-foreground-muted flex items-center gap-1">
+              <Store className="w-3.5 h-3.5" />
+              <span>COMMERCE PORTAL</span>
+            </div>
+            <div className="text-sm font-black uppercase text-foreground">ENABLE MERCHANT POS MODE</div>
+            <div className="text-[11px] text-foreground-muted">Generate instant QR bills, track inventory offline</div>
+          </div>
+          <Link
+            href="/merchant-setup"
+            className="neo-btn py-2 px-3 text-xs"
+          >
+            ENABLE NOW
+          </Link>
+        </div>
+      </div>
 
       {/* Recent Activity List */}
       <div className="neo-box p-6 space-y-4 lg:col-start-2 lg:row-start-1 lg:row-span-2">
@@ -207,24 +226,6 @@ export default function CustomerDashboardPage() {
             ))}
           </div>
         )}
-      </div>
-
-      {/* Enable Merchant Mode Promotion */}
-      <div className="neo-box p-5 flex items-center justify-between lg:col-start-1">
-        <div className="space-y-1">
-          <div className="text-[10px] font-black uppercase text-foreground-muted flex items-center gap-1">
-            <Store className="w-3.5 h-3.5" />
-            <span>COMMERCE PORTAL</span>
-          </div>
-          <div className="text-sm font-black uppercase text-foreground">ENABLE MERCHANT POS MODE</div>
-          <div className="text-[11px] text-foreground-muted">Generate instant QR bills, track inventory offline</div>
-        </div>
-        <Link
-          href="/merchant-setup"
-          className="neo-btn py-2 px-3 text-xs"
-        >
-          ENABLE NOW
-        </Link>
       </div>
       </div>
 
