@@ -173,7 +173,7 @@ export default function MerchantProductsPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6">
+    <div className="merchant-theme max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6">
       {/* Scan Feedback Banner */}
       {scanFeedback && (
         <div
@@ -209,7 +209,7 @@ export default function MerchantProductsPage() {
           </button>
           <button
             onClick={handleOpenAdd}
-            className="px-5 py-3 bg-brand-blue hover:bg-brand-darkBlue text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center justify-center gap-2"
+            className="px-5 py-3 bg-brand-blue hover:bg-brand-darkBlue font-bold rounded-xl text-xs shadow-md transition-all flex items-center justify-center gap-2"
           >
             <Plus className="w-4 h-4" />
             <span>Add New Product</span>

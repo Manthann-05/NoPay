@@ -135,7 +135,7 @@ export default function MerchantTransactionsPage() {
   });
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6">
+    <div className="merchant-theme max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -182,7 +182,7 @@ export default function MerchantTransactionsPage() {
               onClick={() => setFilter(tab)}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 filter === tab
-                  ? 'bg-navy-900 text-white shadow-sm'
+                  ? 'bg-navy-900 shadow-sm'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >

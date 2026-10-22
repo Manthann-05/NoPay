@@ -84,7 +84,7 @@ export default function MerchantStaticQrPage() {
   });
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 space-y-6">
+    <div className="merchant-theme max-w-7xl mx-auto py-8 px-4 space-y-6">
       <div className="space-y-2">
         <h1 className="text-2xl font-black text-navy-900">Permanent Merchant Static QR</h1>
         <p className="max-w-3xl text-sm text-slate-500">
@@ -97,7 +97,7 @@ export default function MerchantStaticQrPage() {
           {/* Printable Poster Container */}
           <div className="bg-white rounded-3xl border-2 border-slate-200 p-6 sm:p-8 shadow-card text-center space-y-5 print:border-none print:shadow-none">
             <div className="space-y-2">
-              <div className="w-14 h-14 bg-navy-900 text-white rounded-2xl flex items-center justify-center mx-auto shadow-md">
+              <div className="w-14 h-14 bg-navy-900 rounded-2xl flex items-center justify-center mx-auto shadow-md">
                 <Store className="w-7 h-7 text-brand-lightBlue" />
               </div>
               <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
@@ -127,7 +127,7 @@ export default function MerchantStaticQrPage() {
           <div className="flex print:hidden">
             <button
               onClick={() => window.print()}
-              className="w-full py-3.5 bg-navy-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+              className="w-full py-3.5 bg-navy-900 text-xs font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
             >
               <Printer className="w-4 h-4 text-brand-lightBlue" />
               <span>Print QR Poster</span>

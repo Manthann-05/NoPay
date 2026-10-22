@@ -99,13 +99,6 @@ export function QrCodeGenerator({
             <Download className="w-3.5 h-3.5" />
             <span>DOWNLOAD</span>
           </button>
-          <button
-            onClick={handlePrint}
-            className="flex-1 neo-btn py-2 px-3 text-xs"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span>PRINT</span>
-          </button>
         </div>
       )}
     </div>

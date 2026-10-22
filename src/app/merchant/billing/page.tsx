@@ -299,7 +299,7 @@ export default function MerchantPosBillingPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-4">
+    <div className="merchant-theme max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-4">
       {/* Barcode notification banner */}
       {barcodeToast && (
         <div
@@ -368,11 +368,11 @@ export default function MerchantPosBillingPage() {
                     onClick={() => setSelectedCategory(cat)}
                     className={`px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
                       selectedCategory === cat
-                        ? 'bg-navy-900 text-white shadow-sm'
+                        ? 'bg-navy-900 shadow-sm'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    {cat}
+                    {cat} 
                   </button>
                 ))}
               </div>
@@ -415,7 +415,7 @@ export default function MerchantPosBillingPage() {
 
                   <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                     <span className="text-base font-black text-navy-900">₹{p.price.toFixed(2)}</span>
-                    <div className="w-7 h-7 bg-blue-50 text-brand-blue rounded-lg flex items-center justify-center font-black group-hover:bg-brand-blue group-hover:text-white transition-colors">
+                    <div className="h-7 w-7 flex items-center justify-center font-black rounded-lg bg-brand-blue">
                       +
                     </div>
                   </div>
@@ -432,7 +432,7 @@ export default function MerchantPosBillingPage() {
               <ShoppingCart className="w-5 h-5 text-brand-blue" />
               <h2 className="text-lg font-black text-navy-900">Active Bill Cart</h2>
             </div>
-            <span className="text-xs font-bold px-2.5 py-1 bg-blue-50 text-brand-blue rounded-full">
+            <span className="text-xs font-bold px-2.5 py-1 bg-brand-blue/10 text-brand-blue rounded-full">
               {cart.reduce((sum, i) => sum + i.quantity, 0)} items
             </span>
           </div>
@@ -552,7 +552,7 @@ export default function MerchantPosBillingPage() {
             <button
               onClick={handleGenerateBillQr}
               disabled={cart.length === 0}
-              className="w-full py-3.5 bg-brand-blue hover:bg-brand-darkBlue text-white font-black rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+              className="w-full py-3.5 bg-brand-blue hover:bg-brand-darkBlue font-black rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50"
             >
               <QrCode className="w-5 h-5" />
               <span>Generate Bill QR Code</span>

@@ -286,6 +286,52 @@ body {
   border-color: var(--border) !important;
 }
 
+/* Merchant workspaces use theme-aware versions of their legacy utility colors. */
+.merchant-theme .bg-white {
+  background-color: var(--surface-raised) !important;
+  color: var(--foreground) !important;
+  border-color: var(--bg-tertiary) !important;
+}
+
+.merchant-theme .bg-slate-50,
+.merchant-theme .bg-slate-100 {
+  background-color: var(--bg-secondary) !important;
+  color: var(--foreground) !important;
+  border-color: var(--bg-tertiary) !important;
+}
+
+.merchant-theme .bg-slate-200 {
+  background-color: var(--bg-tertiary) !important;
+  color: var(--foreground) !important;
+  border-color: var(--bg-tertiary) !important;
+}
+
+.merchant-theme .text-navy-900,
+.merchant-theme .text-navy-950,
+.merchant-theme .text-navy-800,
+.merchant-theme .text-navy-700,
+.merchant-theme .text-slate-900,
+.merchant-theme .text-slate-800,
+.merchant-theme .text-slate-700 {
+  color: var(--foreground) !important;
+}
+
+.merchant-theme .text-slate-600,
+.merchant-theme .text-slate-500 {
+  color: var(--foreground-muted) !important;
+}
+
+.merchant-theme .text-slate-400,
+.merchant-theme .text-slate-300 {
+  color: var(--foreground-subtle) !important;
+}
+
+.merchant-theme .border-slate-100,
+.merchant-theme .border-slate-200,
+.merchant-theme .border-slate-300 {
+  border-color: var(--bg-tertiary) !important;
+}
+
 /* Neobrutalist input and card text safety in dark mode */
 .dark input,
 .dark select,
@@ -297,4 +343,3 @@ body {
 .dark textarea::placeholder {
   color: #71717a !important;
 }
-
