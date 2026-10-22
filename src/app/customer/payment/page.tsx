@@ -3,8 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Transaction } from '@/types';
-import { CheckCircle2, Clock, ShieldCheck, ArrowRight, RefreshCw, Home, FileText } from 'lucide-react';
-import { CustomerTransactionPaymentAction } from '@/components/payments/CustomerTransactionPaymentAction';
+import { CheckCircle2, Clock, Home, FileText } from 'lucide-react';
 
 // Force dynamic rendering to avoid pre-rendering issues with client-side hooks
 export const dynamic = 'force-dynamic';
@@ -28,7 +27,7 @@ function PaymentStatusContent() {
   }, []);
 
   const isQueued = statusParam === 'queued' || txn?.status === 'PENDING_SYNC';
-  const isUnpaid = Boolean(txn && txn.paymentStatus !== 'PAID');
+  const isUnpaid = !txn || txn.paymentStatus !== 'PAID';
 
   return (
     <div className="max-w-md mx-auto py-8 px-4 text-center space-y-6">
@@ -45,19 +44,19 @@ function PaymentStatusContent() {
         <div>
           <h2 className="text-2xl font-black text-navy-900">
             {isQueued
-              ? 'Offline Record Pending'
+              ? 'Record Saved on This Device'
               : txn?.paymentStatus === 'PAID'
                 ? 'Payment Confirmed'
-                : 'Record Synced · Payment Unpaid'}
+                : 'QR Record Created · NoPay Payment Not Made'}
           </h2>
           <p className="text-xs text-slate-500 mt-1">
             {isQueued
-              ? 'This pending record is stored only on this device and syncs when you reconnect. The merchant cannot see it while you are offline. NoPay does not transfer or verify money.'
+              ? 'This record is saved only on this device. The merchant cannot see it yet. NoPay does not transfer money or confirm any external payment.'
               : txn?.paymentStatus === 'PAID'
-                ? 'Razorpay confirmed the payment capture. Merchant payout status is shown separately.'
+                ? 'NoPay online checkout confirmed the payment capture. Merchant payout status is shown separately.'
                 : txn?.deferredPaymentConsent
-                  ? 'The record is synced but still unpaid. If the bill and mandate pass server validation, a debit is scheduled only after Razorpay sends its required pre-debit notice. This is not a guarantee of payment.'
-                  : 'The record reached NoPay, but no payment has been made. Review the merchant and amount, then complete payment online.'}
+                  ? 'The record is stored in NoPay. If the bill and mandate pass server validation, a debit is scheduled only after Razorpay sends its required pre-debit notice. This is not a guarantee of payment.'
+                  : 'The transaction record reached NoPay, but this record does not confirm payment. Verify any cash, UPI, or bank payment separately.'}
           </p>
         </div>
 
@@ -83,19 +82,6 @@ function PaymentStatusContent() {
             </div>
           </div>
         )}
-
-        {txn &&
-          !isQueued &&
-          txn.paymentStatus !== 'PAID' &&
-          txn.paymentStatus !== 'AUTOPAY_SCHEDULED' &&
-          txn.autopayStatus !== 'SCHEDULING' &&
-          txn.autopayStatus !== 'SCHEDULED' && (
-            <CustomerTransactionPaymentAction
-              transactionId={txn.transactionId}
-              amount={txn.amount}
-              onPaid={(updated) => setTxn({ ...txn, ...updated })}
-            />
-          )}
 
         <div className="space-y-3 pt-2">
           <button

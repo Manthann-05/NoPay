@@ -6,14 +6,12 @@ import { useRouter } from 'next/navigation';
 import { getMerchantOfflineTransactions, isCurrentMerchantTransaction } from '@/offline/queue';
 import { subscribeToTransactionEvents } from '@/offline/liveChannel';
 import { Transaction } from '@/types';
-import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
 import { useSnackbar } from '@/components/shared/SnackbarProvider';
 import {
   CreditCard,
   QrCode,
   Package,
   TrendingUp,
-  Clock,
   ArrowRight,
   FileText,
   BarChart3,
@@ -28,7 +26,6 @@ export default function MerchantDashboardPage() {
   const [stats, setStats] = useState({
     recordedAmount: 0,
     totalRecordCount: 0,
-    pendingRecordCount: 0,
     activeProductsCount: 0,
   });
   const [recentTxns, setRecentTxns] = useState<Transaction[]>([]);
@@ -36,6 +33,13 @@ export default function MerchantDashboardPage() {
 
   useEffect(() => {
     loadDashboardData();
+
+    const refreshWhenVisible = () => {
+      if (!document.hidden && navigator.onLine) void loadDashboardData();
+    };
+    const refreshInterval = window.setInterval(refreshWhenVisible, 10000);
+    window.addEventListener('online', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
 
     const unsubscribe = subscribeToTransactionEvents((detail) => {
       void isCurrentMerchantTransaction(detail.transaction)
@@ -45,8 +49,8 @@ export default function MerchantDashboardPage() {
           if (detail.action === 'CREATED') {
             showSnackbar({
               type: detail.isOffline ? 'pending' : 'success',
-              title: detail.isOffline ? 'New Offline Record Received' : 'Transaction Record Created',
-              description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId}.`,
+              title: detail.isOffline ? 'Record Saved on This Device' : 'QR Record Received',
+              description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId}. This record does not confirm payment.`,
               durationMs: 5000,
             });
           }
@@ -55,6 +59,9 @@ export default function MerchantDashboardPage() {
     });
 
     return () => {
+      window.clearInterval(refreshInterval);
+      window.removeEventListener('online', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
       unsubscribe();
     };
   }, []);
@@ -102,17 +109,10 @@ export default function MerchantDashboardPage() {
 
       const ledgerRecords = merged.filter((t) => t.status === 'CONFIRMED' || t.status === 'SYNCED');
       const recordedAmount = ledgerRecords.reduce((sum, t) => sum + t.amount, 0);
-      const pendingRecordCount = merged.filter((t) =>
-        t.status === 'LOCAL_CREATED' ||
-        t.status === 'PENDING_SYNC' ||
-        t.status === 'SYNCING' ||
-        t.status === 'RETRY_PENDING'
-      ).length;
 
       setStats({
         recordedAmount,
         totalRecordCount: merged.length,
-        pendingRecordCount,
         activeProductsCount: productsCount,
       });
 
@@ -141,7 +141,7 @@ export default function MerchantDashboardPage() {
             MERCHANT COMMAND CENTER
           </h1>
           <p className="text-xs text-foreground-muted max-w-xl">
-            Compile customer bills, generate cryptographic dynamic QR barcodes, and monitor local transaction logs.
+            Create bills, generate QR codes, and review transaction records. A QR record does not confirm money was paid.
           </p>
         </div>
 
@@ -164,14 +164,14 @@ export default function MerchantDashboardPage() {
       </div>
 
       {/* Metrics Cards (Neobrutalist solid blocks) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         <div className="neo-box p-5 space-y-2">
           <div className="flex justify-between items-center text-foreground-muted">
-            <span className="text-xs font-black uppercase">LEDGER VOLUME</span>
+            <span className="text-xs font-black uppercase">QR RECORD TOTAL</span>
             <TrendingUp className="w-4 h-4 text-foreground" />
           </div>
           <p className="text-3xl font-black text-foreground">₹{stats.recordedAmount.toFixed(2)}</p>
-          <p className="text-[10px] text-foreground-muted uppercase">SYNCED LEDGER ENTRIES</p>
+          <p className="text-[10px] text-foreground-muted uppercase">RECORD AMOUNT · NOT PAYMENT TOTAL</p>
         </div>
 
         <div className="neo-box p-5 space-y-2">
@@ -181,22 +181,6 @@ export default function MerchantDashboardPage() {
           </div>
           <p className="text-3xl font-black text-foreground">{stats.totalRecordCount}</p>
           <p className="text-[10px] text-foreground-muted uppercase">INCLUDES QUEUED ENTRIES</p>
-        </div>
-
-        <div className="neo-box p-5 space-y-2">
-          <div className="flex justify-between items-center text-foreground-muted">
-            <span className="text-xs font-black uppercase">PENDING SYNC</span>
-            <Clock className="w-4 h-4 text-foreground" />
-          </div>
-          <div className="flex items-center gap-2">
-            <p className="text-3xl font-black text-foreground">{stats.pendingRecordCount}</p>
-            {stats.pendingRecordCount > 0 && (
-              <span className="text-[9px] font-black border border-border bg-foreground text-background px-1.5 py-0.2 uppercase">
-                QUEUED
-              </span>
-            )}
-          </div>
-          <p className="text-[10px] text-foreground-muted uppercase">SYNC RESTORES ON CONNECT</p>
         </div>
 
         <div className="neo-box p-5 space-y-2">
@@ -245,7 +229,7 @@ export default function MerchantDashboardPage() {
             <Zap className="w-5 h-5" />
           </div>
           <h3 className="text-sm font-black uppercase text-foreground">
-            TRANSACTIONS ({stats.pendingRecordCount})
+            TRANSACTIONS ({stats.totalRecordCount})
           </h3>
           <p className="text-xs text-foreground-muted">Audit transaction ledger status and signatures</p>
         </Link>
@@ -262,6 +246,11 @@ export default function MerchantDashboardPage() {
           </h3>
           <p className="text-xs text-foreground-muted">Sales distribution analytics & ledger exports</p>
         </Link>
+      </div>
+
+      <div className="border-2 border-amber-500 bg-amber-50 p-4 text-xs leading-5 text-amber-950">
+        <strong>Payment transparency:</strong> QR scans create transaction records only. They do not transfer money or
+        confirm cash, UPI, or bank payments made outside NoPay. Verify external payments in your payment app or bank.
       </div>
 
       {/* Recent Ledger Transactions */}
@@ -293,9 +282,6 @@ export default function MerchantDashboardPage() {
                     <span className="font-black text-foreground">{t.transactionId}</span>
                     <span className="text-[9px] font-bold border border-border px-1.5 py-0.2 bg-surface text-foreground">
                       {t.type}
-                    </span>
-                    <span className={`text-[9px] font-black px-2 py-0.5 uppercase ${transactionStatusTone(t.status)}`}>
-                      {transactionStatusLabel(t.status)}
                     </span>
                   </div>
 

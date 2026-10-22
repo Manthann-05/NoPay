@@ -231,7 +231,7 @@ export function CustomerBillPayment({ billIdParam }: { billIdParam?: string }) {
           showSnackbar({
             type: 'success',
             title: 'Bill Record Synced',
-            description: `The ₹${bill.total.toFixed(2)} record for Bill ${bill.billId} was saved to the NoPay ledger. NoPay does not transfer or verify money.`,
+            description: `The ₹${bill.total.toFixed(2)} record for Bill ${bill.billId} was saved in NoPay. This does not confirm that money was paid.`,
           });
           window.location.assign('/customer/payment?status=confirmed');
           return;
@@ -370,6 +370,11 @@ export function CustomerBillPayment({ billIdParam }: { billIdParam?: string }) {
                 )}
               </div>
             )}
+
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
+              <strong>This saves a transaction record, not a payment.</strong> NoPay does not transfer money or confirm
+              cash, UPI, or bank payments made outside NoPay. Verify any external payment in your payment app or bank.
+            </div>
 
             {/* Itemized Table */}
             <div>

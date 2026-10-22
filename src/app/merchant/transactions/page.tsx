@@ -8,9 +8,8 @@ import {
 import { offlineDb } from '@/offline/db';
 import { subscribeToTransactionEvents } from '@/offline/liveChannel';
 import { Transaction } from '@/types';
-import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
 import { useSnackbar } from '@/components/shared/SnackbarProvider';
-import { FileText, Clock, CheckCircle2, Search, RefreshCw, X, ArrowUpRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Search, RefreshCw, X } from 'lucide-react';
 
 export default function MerchantTransactionsPage() {
   const { showSnackbar } = useSnackbar();
@@ -44,15 +43,15 @@ export default function MerchantTransactionsPage() {
           if (detail.action === 'CREATED') {
             showSnackbar({
               type: detail.isOffline ? 'pending' : 'success',
-              title: detail.isOffline ? 'New Offline Record Received' : 'Transaction Record Created',
-              description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId}. NoPay has not verified a money transfer.`,
+              title: detail.isOffline ? 'Record Saved on This Device' : 'New QR Record Received',
+              description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId}. NoPay records the amount; it does not confirm that money was paid.`,
               durationMs: 5000,
             });
           } else if (detail.action === 'SYNCED') {
             showSnackbar({
               type: 'success',
-              title: 'Transaction Record Synced',
-              description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId} is recorded in the NoPay ledger.`,
+              title: 'QR Record Received',
+              description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId} is available in NoPay. Payment is not confirmed by this record.`,
               durationMs: 4000,
             });
           }
@@ -142,7 +141,7 @@ export default function MerchantTransactionsPage() {
         <div>
           <h1 className="text-2xl font-black text-navy-900">Merchant Transaction Records</h1>
           <p className="text-xs text-slate-500">
-            Server-synced records refresh automatically and are cached on this device. A customer’s record cannot reach your device while both phones are offline.
+            These are QR transaction records, not proof of payment. NoPay does not confirm money paid outside its online checkout.
           </p>
         </div>
         <div className="flex gap-2">
@@ -154,6 +153,11 @@ export default function MerchantTransactionsPage() {
             <span>Refresh</span>
           </button>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900">
+        <strong>Payment transparency:</strong> Scanning a QR creates a record of the amount only. It does not transfer
+        money or confirm an external cash, UPI, or bank payment. Check your payment app or bank separately.
       </div>
 
       {/* Controls */}
@@ -208,7 +212,6 @@ export default function MerchantTransactionsPage() {
                   <th className="p-4">Txn ID</th>
                   <th className="p-4">Type</th>
                   <th className="p-4">Amount</th>
-                  <th className="p-4">Sync Status</th>
                   <th className="p-4">Payment Status</th>
                   <th className="p-4">Customer</th>
                   <th className="p-4">Date & Time</th>
@@ -227,29 +230,15 @@ export default function MerchantTransactionsPage() {
                       </span>
                     </td>
                     <td className="p-4 font-black text-brand-blue">₹{t.amount.toFixed(2)}</td>
-                    <td className="p-4">
-                      <span
-                        className={`px-2.5 py-1 text-[10px] font-extrabold rounded-md flex items-center gap-1 w-fit ${transactionStatusTone(t.status)}`}
-                      >
-                        {t.status === 'PENDING_SYNC' || t.status === 'RETRY_PENDING' ? (
-                          <Clock className="w-3 h-3 animate-pulse" />
-                        ) : t.status === 'CONFIRMED' || t.status === 'SYNCED' ? (
-                          <CheckCircle2 className="w-3 h-3" />
-                        ) : (
-                          <AlertCircle className="w-3 h-3" />
-                        )}
-                        <span>{transactionStatusLabel(t.status)}</span>
-                      </span>
-                    </td>
                     <td className="p-4 text-[10px] font-semibold">
                       <span>
                         {t.paymentStatus === 'PAID'
-                          ? 'Provider payment captured'
+                          ? 'NoPay online payment captured'
                           : t.paymentStatus === 'AUTOPAY_SCHEDULED'
                             ? 'AutoPay scheduled'
                             : t.paymentStatus === 'FAILED'
                               ? 'Debit failed'
-                              : 'Unverified'}
+                              : 'Payment not confirmed by NoPay'}
                       </span>
                       {t.autopayStatus && (
                         <span className="mt-1 block text-slate-500">
@@ -326,23 +315,20 @@ export default function MerchantTransactionsPage() {
                 <span className="font-bold text-navy-900">{selectedTxn.type}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400 font-semibold">Current State</span>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${transactionStatusTone(selectedTxn.status)}`}>
-                  {transactionStatusLabel(selectedTxn.status)}
-                </span>
-              </div>
-              <div className="flex justify-between">
                 <span className="text-slate-400 font-semibold">Payment Status</span>
                 <span className="font-semibold">
                   {selectedTxn.paymentStatus === 'PAID'
-                    ? 'Provider debit captured'
+                    ? 'NoPay online payment captured'
                     : selectedTxn.paymentStatus === 'AUTOPAY_SCHEDULED'
                       ? 'AutoPay debit scheduled'
                       : selectedTxn.paymentStatus === 'FAILED'
                         ? 'AutoPay debit failed'
-                        : 'Unverified'}
+                        : 'Payment not confirmed by NoPay'}
                 </span>
               </div>
+              <p className="border-t border-slate-200 pt-2 text-[11px] leading-5 text-amber-800">
+                A QR record alone does not confirm that money was paid. Check your payment app or bank separately.
+              </p>
               {selectedTxn.autopayStatus && (
                 <div className="flex justify-between">
                   <span className="text-slate-400 font-semibold">Merchant Payout</span>

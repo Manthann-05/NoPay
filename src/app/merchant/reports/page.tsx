@@ -105,7 +105,7 @@ export default function MerchantReportsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-navy-900">Transaction Record Reports</h1>
-          <p className="text-xs text-slate-400">Server-synced records only; NoPay does not verify money settlement.</p>
+          <p className="text-xs text-slate-400">QR record totals are not payment totals; NoPay cannot confirm payments made outside its online checkout.</p>
         </div>
         <button
           onClick={loadTransactions}
@@ -141,7 +141,7 @@ export default function MerchantReportsPage() {
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
           <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Recorded Amount</span>
           <p className="text-2xl font-black text-navy-900">₹{recordedAmount.toFixed(0)}</p>
-          <p className="text-[11px] text-slate-500">{txnCount} server-synced records</p>
+          <p className="text-[11px] text-slate-500">{txnCount} records received by NoPay</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
           <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Average Record</span>
@@ -151,12 +151,12 @@ export default function MerchantReportsPage() {
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
           <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Bill QR</span>
           <p className="text-2xl font-black text-brand-blue">₹{billQrAmount.toFixed(0)}</p>
-          <p className="text-[11px] text-slate-500">server-synced records</p>
+          <p className="text-[11px] text-slate-500">records received by NoPay</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
           <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Static QR</span>
           <p className="text-2xl font-black text-purple-600">₹{staticQrAmount.toFixed(0)}</p>
-          <p className="text-[11px] text-slate-500">server-synced records</p>
+          <p className="text-[11px] text-slate-500">records received by NoPay</p>
         </div>
       </div>
 
@@ -237,11 +237,7 @@ export default function MerchantReportsPage() {
                 </div>
                 <div className="text-right">
                   <p className="font-black text-base text-navy-900">₹{t.amount.toFixed(2)}</p>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    t.status === 'CONFIRMED' || t.status === 'SYNCED'
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-amber-100 text-amber-700'
-                  }`}>{t.status}</span>
+                  <span className="text-[10px] font-bold text-slate-500">QR record</span>
                 </div>
               </div>
             ))}
@@ -249,12 +245,12 @@ export default function MerchantReportsPage() {
         </div>
       )}
 
-      {/* Sync Health */}
+      {/* Records Waiting for Connection */}
       {pendingCount > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-4">
           <div>
             <p className="text-xs font-bold text-amber-900">{pendingCount} pending transaction record{pendingCount > 1 ? 's' : ''}</p>
-            <p className="text-[11px] text-amber-700">Customer-submitted records remain unverified until checked outside NoPay.</p>
+            <p className="text-[11px] text-amber-700">NoPay does not confirm payments made outside its online checkout. Check your payment app or bank separately.</p>
           </div>
           <a
             href="/merchant/transactions"

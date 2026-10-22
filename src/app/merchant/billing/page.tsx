@@ -576,7 +576,7 @@ export default function MerchantPosBillingPage() {
               <span className="text-[10px] font-extrabold uppercase text-emerald-600 tracking-wider bg-emerald-50 px-3 py-1 rounded-full">
                 Bill QR Ready
               </span>
-              <h3 className="text-xl font-black text-navy-900">Scan to Pay ₹{generatedBillTotal.toFixed(2)}</h3>
+              <h3 className="text-xl font-black text-navy-900">Scan to Create Record · ₹{generatedBillTotal.toFixed(2)}</h3>
               <p className="text-xs text-slate-500">Bill ID: {generatedBillId}</p>
             </div>
 
@@ -600,16 +600,21 @@ export default function MerchantPosBillingPage() {
                 {billPaymentStatus === 'CONFIRMED' || billPaymentStatus === 'SYNCED' ? (
                   <>
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>Bill record saved to NoPay ledger</span>
+                    <span>Bill record received by NoPay · payment not confirmed</span>
                   </>
                 ) : (
                   <>
                     <Clock className="w-4 h-4 text-amber-600 animate-pulse" />
-                    <span>Offline bill record pending sync</span>
+                    <span>Offline record saved on this device only</span>
                   </>
                 )}
               </div>
             ) : null}
+
+            <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
+              This QR records the bill amount only. It does not transfer money or confirm an external cash, UPI, or bank
+              payment. Check your payment app or bank separately.
+            </p>
 
             <button
               onClick={() => {

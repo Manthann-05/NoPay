@@ -5,10 +5,8 @@ import { useRouter } from 'next/navigation';
 import { getOfflineTransactions } from '@/offline/queue';
 import { subscribeToTransactionEvents } from '@/offline/liveChannel';
 import { Transaction } from '@/types';
-import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
 import { useSnackbar } from '@/components/shared/SnackbarProvider';
-import { ArrowLeft, Clock, CheckCircle2, ShoppingBag, Search, WifiOff, RefreshCw } from 'lucide-react';
-import { CustomerTransactionPaymentAction } from '@/components/payments/CustomerTransactionPaymentAction';
+import { ArrowLeft, ShoppingBag, Search, WifiOff, RefreshCw, FileText } from 'lucide-react';
 
 // Force dynamic rendering to avoid pre-rendering issues with client-side hooks
 export const dynamic = 'force-dynamic';
@@ -38,8 +36,8 @@ export default function CustomerTransactionsPage() {
       if (detail.action === 'SYNCED') {
         showSnackbar({
           type: 'success',
-          title: 'Transaction Synchronized',
-          description: `₹${detail.transaction.amount.toFixed(2)} - ${detail.transaction.transactionId} is recorded in NoPay; money transfer remains unverified.`,
+          title: 'QR Record Received',
+          description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId} is saved in NoPay. This does not confirm any external payment.`,
         });
       }
     });
@@ -122,7 +120,7 @@ export default function CustomerTransactionsPage() {
               filter === tab ? 'bg-white text-navy-900 shadow-sm' : 'text-slate-500 hover:text-navy-900'
             }`}
           >
-            {tab === 'ALL' ? 'All Transactions' : tab === 'PENDING' ? 'Offline Queued' : 'Synced'}
+            {tab === 'ALL' ? 'All Transactions' : tab === 'PENDING' ? 'Saved on Device' : 'Received by NoPay'}
           </button>
         ))}
       </div>
@@ -134,7 +132,7 @@ export default function CustomerTransactionsPage() {
         <div className="bg-white p-8 rounded-3xl border border-slate-200 text-center space-y-3">
           <ShoppingBag className="w-10 h-10 text-slate-300 mx-auto" />
           <h3 className="text-base font-bold text-navy-900">No Transactions Found</h3>
-          <p className="text-xs text-slate-500">Scan a QR code to complete your first payment.</p>
+          <p className="text-xs text-slate-500">Scan a QR code to create your first transaction record.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -144,35 +142,28 @@ export default function CustomerTransactionsPage() {
               className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center justify-between"
             >
               <div className="flex items-center gap-3">
-                <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center ${transactionStatusTone(t.status)}`}
-                >
-                  {t.status === 'PENDING_SYNC' || t.status === 'RETRY_PENDING' ? (
-                    <Clock className="w-5 h-5" />
-                  ) : (
-                    <CheckCircle2 className="w-5 h-5" />
-                  )}
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-slate-100 text-slate-600">
+                  <FileText className="w-5 h-5" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h4 className="text-sm font-bold text-navy-900">{t.merchantName}</h4>
-                    <span
-                      className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md ${transactionStatusTone(t.status)}`}
-                    >
-                      {transactionStatusLabel(t.status).toUpperCase()}
-                    </span>
                   </div>
                   <p className="text-[11px] text-slate-400 font-mono">
                     {new Date(t.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                   </p>
                   <p className="mt-1 text-[11px] font-semibold text-slate-600">
-                    Payment: {t.paymentStatus === 'PAID'
-                      ? 'Provider payment captured'
+                    {t.status === 'PENDING_SYNC' || t.status === 'RETRY_PENDING'
+                      ? 'Saved on this device · not yet visible to the merchant'
+                      : 'Received by NoPay'}
+                    {' · '}
+                    {t.paymentStatus === 'PAID'
+                      ? 'NoPay online payment captured'
                       : t.paymentStatus === 'AUTOPAY_SCHEDULED'
                         ? 'AutoPay debit scheduled'
                         : t.paymentStatus === 'FAILED'
                           ? 'AutoPay debit failed'
-                          : 'Not verified'}
+                          : 'NoPay has no payment confirmation'}
                     {t.autopayStatus === 'TRANSFER_PENDING' && ' · Merchant payout pending'}
                     {t.autopayStatus === 'TRANSFERRED' && ' · Merchant transfer processed (bank settlement is separate)'}
                     {t.autopayStatus === 'TRANSFER_FAILED' && ' · Merchant payout failed'}
@@ -183,25 +174,6 @@ export default function CustomerTransactionsPage() {
                     {t.payoutStatus === 'TRANSFERRED' && ' · Merchant transfer processed (bank settlement is separate)'}
                     {t.payoutStatus === 'TRANSFER_FAILED' && ' · Merchant payout needs review'}
                   </p>
-                  {(t.status === 'CONFIRMED' || t.status === 'SYNCED') &&
-                    t.paymentStatus !== 'PAID' &&
-                    t.paymentStatus !== 'AUTOPAY_SCHEDULED' &&
-                    t.autopayStatus !== 'SCHEDULING' &&
-                    t.autopayStatus !== 'SCHEDULED' && (
-                      <CustomerTransactionPaymentAction
-                        transactionId={t.transactionId}
-                        amount={t.amount}
-                        onPaid={(updated) => {
-                          setTransactions((current) =>
-                            current.map((transaction) =>
-                              transaction.transactionId === t.transactionId
-                                ? { ...transaction, ...updated }
-                                : transaction
-                            )
-                          );
-                        }}
-                      />
-                    )}
                 </div>
               </div>
 

@@ -108,7 +108,7 @@ export async function POST(req: Request) {
     let amount = validated.amount;
     let billSummary;
     let billForAutoPay = null;
-    let paymentStatus: 'UNVERIFIED' | 'PENDING' = 'UNVERIFIED';
+    let paymentStatus: 'PENDING' | undefined;
 
     if (validated.type === 'STATIC_QR') {
       if (!(amount > 0)) {
@@ -211,7 +211,7 @@ export async function POST(req: Request) {
 
     let autoPay: AutoPayScheduleResult = {
       status: 'SKIPPED',
-      reason: 'unverified_bill_or_static_qr',
+      reason: 'payment_capture_not_available',
     };
     if (billForAutoPay) {
       autoPay = await scheduleBillAutoPay(billForAutoPay, newTxn);
@@ -220,7 +220,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       idempotent: false,
-      message: 'Transaction record synchronized; payment remains unverified until a provider capture.',
+      message: 'Transaction record saved; NoPay has not confirmed an external payment.',
       transaction: newTxn,
       autoPay,
     });

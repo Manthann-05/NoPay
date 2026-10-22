@@ -19,7 +19,7 @@ export interface ITransaction extends Document {
   razorpayOrderId?: string;
   razorpayTransferId?: string;
   payoutStatus?: 'PENDING' | 'TRANSFER_PENDING' | 'TRANSFERRED' | 'TRANSFER_FAILED';
-  paymentStatus: 'UNVERIFIED' | 'PENDING' | 'AUTOPAY_SCHEDULED' | 'PAID' | 'FAILED';
+  paymentStatus?: 'PENDING' | 'AUTOPAY_SCHEDULED' | 'PAID' | 'FAILED';
   deferredPaymentConsent: boolean;
   deferredPaymentConsentAt?: Date;
   autopayStatus?:
@@ -67,8 +67,7 @@ const TransactionSchema = new Schema<ITransaction>(
     },
     paymentStatus: {
       type: String,
-      enum: ['UNVERIFIED', 'PENDING', 'AUTOPAY_SCHEDULED', 'PAID', 'FAILED'],
-      default: 'UNVERIFIED',
+      enum: ['PENDING', 'AUTOPAY_SCHEDULED', 'PAID', 'FAILED'],
       index: true,
     },
     deferredPaymentConsent: { type: Boolean, default: false },

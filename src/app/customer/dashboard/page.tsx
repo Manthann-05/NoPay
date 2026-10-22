@@ -8,7 +8,6 @@ import { QrScannerModal } from '@/components/qr/QrScannerModal';
 import { getAllLocalTransactions } from '@/offline/queue';
 import { ScannedQrResult } from '@/lib/qr/payload';
 import { storeScannedQrRaw } from '@/lib/qr/scanHandoff';
-import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
 import { Transaction } from '@/types';
 import { useMounted } from '@/hooks/useMounted';
 
@@ -138,8 +137,11 @@ export default function CustomerDashboardPage() {
         <div className="flex items-center justify-between border-b-2 border-border pb-3">
           <div className="flex items-center gap-2">
             <History className="w-4 h-4" />
-            <h3 className="font-black uppercase text-xs text-foreground">RECENT LEDGER ENTRIES</h3>
+            <h3 className="font-black uppercase text-xs text-foreground">RECENT QR RECORDS</h3>
           </div>
+          <p className="text-[11px] leading-5 text-foreground-muted">
+            A QR record is not a payment receipt. NoPay does not confirm cash, UPI, or bank payments made outside the app.
+          </p>
           <Link
             href="/customer/transactions"
             className="text-xs font-bold underline text-foreground hover:opacity-80 flex items-center gap-1"
@@ -170,8 +172,8 @@ export default function CustomerDashboardPage() {
                 </div>
                 <div className="text-right">
                   <div className="text-sm font-black text-foreground">₹{txn.amount}</div>
-                  <span className={`inline-block text-[9px] font-black px-2 py-0.5 uppercase mt-0.5 ${transactionStatusTone(txn.status)}`}>
-                    {transactionStatusLabel(txn.status)}
+                  <span className="inline-block text-[9px] font-black px-2 py-0.5 uppercase mt-0.5 text-foreground-muted">
+                    QR record · not payment confirmation
                   </span>
                 </div>
 

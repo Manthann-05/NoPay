@@ -7,7 +7,7 @@ import { addOfflineTransaction } from '@/offline/queue';
 import { Transaction } from '@/types';
 import { readScannedQr } from '@/lib/qr/scanHandoff';
 import { useSnackbar } from '@/components/shared/SnackbarProvider';
-import { Store, CreditCard, ArrowLeft, ShieldCheck, WifiOff } from 'lucide-react';
+import { Store, CreditCard, ArrowLeft, FileText, WifiOff } from 'lucide-react';
 
 // Force dynamic rendering to avoid pre-rendering issues with client-side hooks
 export const dynamic = 'force-dynamic';
@@ -126,8 +126,8 @@ export default function CustomerStaticPayPage() {
           sessionStorage.setItem('nopay_last_txn', JSON.stringify(confirmedTxn));
           showSnackbar({
             type: 'success',
-            title: 'Payment Record Synced',
-            description: `The ₹${numAmount.toFixed(2)} record was saved to the NoPay ledger. NoPay does not transfer or verify money.`,
+            title: 'QR Record Received',
+            description: `The ₹${numAmount.toFixed(2)} record was saved in NoPay. This does not confirm that money was paid.`,
           });
           window.location.assign('/customer/payment?status=confirmed');
           return;
@@ -212,13 +212,18 @@ export default function CustomerStaticPayPage() {
             </div>
           )}
 
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-left text-xs leading-5 text-amber-950">
+            <strong>This only creates a transaction record.</strong> NoPay will not send money or confirm a cash, UPI,
+            or bank payment made elsewhere. Check the merchant and amount, then verify any external payment in your
+            payment app or bank.
+          </div>
+
           {!isOnline && (
             <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-semibold">
               <WifiOff className="w-4 h-4 shrink-0 text-amber-600" />
               <span>
-                NoPay cannot verify this merchant while offline. This saves only an unpaid record on this device; the
-                merchant cannot see it until it syncs. After reconnecting, review the merchant and amount and complete
-                payment online. The record itself is not proof of payment.
+                NoPay cannot check this merchant while offline. This saves only an unpaid record on this device; the
+                merchant cannot see it until you reconnect. This does not transfer money or confirm any external payment.
               </span>
             </div>
           )}
@@ -288,8 +293,8 @@ export default function CustomerStaticPayPage() {
           )}
 
           <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 font-semibold pt-2">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Offline Record Handoff by QR</span>
+            <FileText className="w-3.5 h-3.5 text-slate-500" />
+            <span>NoPay QR transaction record</span>
           </div>
         </div>
       ) : null}

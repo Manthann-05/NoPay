@@ -7,7 +7,7 @@ import { QrCodeGenerator } from '@/components/qr/QrCodeGenerator';
 import { encodeStaticCustomerQr } from '@/lib/qr/payload';
 import { getLocalSession, clearLocalSession } from '@/offline/session';
 import { notifyAuthStateChanged } from '@/lib/auth/client';
-import { User as UserIcon, ArrowLeft, LogOut, ShieldCheck, Mail, QrCode, CreditCard } from 'lucide-react';
+import { User as UserIcon, ArrowLeft, LogOut, Mail, QrCode, CreditCard } from 'lucide-react';
 
 // Force dynamic rendering to avoid pre-rendering issues with client-side hooks
 export const dynamic = 'force-dynamic';
@@ -123,12 +123,6 @@ export default function CustomerProfilePage() {
           <div className="flex justify-between items-center text-slate-600">
             <span>Account Type</span>
             <span className="font-bold text-navy-900">Standard Customer</span>
-          </div>
-          <div className="flex justify-between items-center text-slate-600">
-            <span>Offline Sync Status</span>
-            <span className="font-bold text-emerald-600 flex items-center gap-1">
-              <ShieldCheck className="w-4 h-4" /> Enabled
-            </span>
           </div>
         </div>
 

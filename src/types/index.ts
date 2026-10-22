@@ -87,7 +87,7 @@ export interface Transaction {
   amount: number;
   type: TransactionType;
   status: TransactionStatus;
-  paymentStatus?: 'UNVERIFIED' | 'PENDING' | 'AUTOPAY_SCHEDULED' | 'PAID' | 'FAILED';
+  paymentStatus?: 'PENDING' | 'AUTOPAY_SCHEDULED' | 'PAID' | 'FAILED';
   payoutStatus?: 'PENDING' | 'TRANSFER_PENDING' | 'TRANSFERRED' | 'TRANSFER_FAILED';
   deferredPaymentConsent?: boolean;
   deferredPaymentConsentAt?: string;
