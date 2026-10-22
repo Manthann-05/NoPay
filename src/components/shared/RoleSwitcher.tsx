@@ -65,7 +65,7 @@ export function RoleSwitcher({ currentRole, roles, hasMerchantProfile, onRoleCha
   };
 
   return (
-    <div className="flex items-center border-2 border-border bg-surface shadow-[2px_2px_0px_0px_var(--border)] p-0.5 font-mono">
+    <div className="flex w-fit max-w-full px-1 items-center border-2 border-border bg-surface shadow-[2px_2px_0px_0px_var(--border)] font-mono">
       <button
         onClick={() => switchRole('CUSTOMER')}
         disabled={loading}
