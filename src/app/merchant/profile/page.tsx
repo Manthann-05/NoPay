@@ -7,7 +7,6 @@ import { User } from '@/types';
 import { clearLocalSession } from '@/offline/session';
 import { notifyAuthStateChanged } from '@/lib/auth/client';
 import { Store, ShieldCheck, LogOut, ArrowLeft, FileCheck2 } from 'lucide-react';
-import { RouteAccountForm } from './route-account-form';
 
 export default function MerchantProfilePage() {
   const router = useRouter();
@@ -47,7 +46,7 @@ export default function MerchantProfilePage() {
         <span>Dashboard</span>
       </button>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(280px,0.72fr)_minmax(0,1.28fr)]">
+      <div className="grid items-start gap-6">
         <section className="bg-white rounded-3xl border border-slate-200 shadow-card p-6 space-y-6">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-navy-900 text-brand-lightBlue rounded-2xl flex items-center justify-center font-black text-xl shadow-md">
@@ -100,8 +99,6 @@ export default function MerchantProfilePage() {
             <span>Sign Out</span>
           </button>
         </section>
-
-        <RouteAccountForm />
       </div>
     </div>
   );

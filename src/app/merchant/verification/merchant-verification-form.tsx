@@ -44,8 +44,8 @@ const BUSINESS_TYPE_LABELS: Record<MerchantVerificationBusinessType, string> = {
 
 const DOCUMENT_STATUS_LABELS: Record<VerificationDocument['status'], string> = {
   UPLOADING: 'Upload incomplete',
-  PENDING_REVIEW: 'Received · not verified',
-  APPROVED: 'Approved',
+  PENDING_REVIEW: 'Received',
+  APPROVED: 'Accepted for NoPay QR',
   REJECTED: 'Needs replacement',
 };
 
@@ -204,8 +204,7 @@ export function MerchantVerificationForm() {
           <div>
             <h2 className="text-lg font-black text-navy-900">Shop verification</h2>
             <p className="mt-1 text-xs leading-5 text-slate-600">
-              Add your legal shop details and supporting documents. Verification is not automatic; a
-              submitted record must be reviewed before it can be marked verified.
+              Add your shop details and upload at least one supporting document to enable NoPay QR records.
             </p>
           </div>
         </div>
@@ -218,7 +217,7 @@ export function MerchantVerificationForm() {
           ) : (
             <ShieldAlert className="h-4 w-4 text-slate-500" />
           )}
-          <span className="font-bold">Status: {statusLabel}</span>
+          <span className="font-bold">Status: {verification.status === 'VERIFIED' ? 'QR records enabled' : statusLabel}</span>
           {verification.submittedAt && (
             <span className="text-slate-500">· Submitted {new Date(verification.submittedAt).toLocaleDateString()}</span>
           )}
@@ -397,8 +396,8 @@ export function MerchantVerificationForm() {
         )}
 
         <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] leading-5 text-amber-900">
-          Files are stored privately. Uploading records does not mean the shop, GSTIN, or documents
-          have been independently verified. Reviewer approval is not available in this merchant portal yet.
+          Files are stored privately. In this web setup, submitting a document enables NoPay QR transaction records;
+          it does not independently verify the shop or transfer real money. Real payment processing is not enabled by this step.
         </p>
       </section>
     </div>

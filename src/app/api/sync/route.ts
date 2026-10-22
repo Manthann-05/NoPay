@@ -5,7 +5,7 @@ import { connectToDatabase } from '@/lib/db/mongodb';
 import { Transaction } from '@/models/Transaction';
 import { SyncLog } from '@/models/SyncLog';
 import { Bill } from '@/models/Bill';
-import { MerchantProfile } from '@/models/MerchantProfile';
+import { MerchantProfile, type MerchantVerificationDocument } from '@/models/MerchantProfile';
 import { TransactionSyncSchema } from '@/lib/validation/schemas';
 import { isBillExpired } from '@/lib/status/labels';
 import { scheduleBillAutoPay, type AutoPayScheduleResult } from '@/lib/payments/autopay';
@@ -84,6 +84,23 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { success: false, error: 'The transaction merchant ID does not match a registered merchant.' },
         { status: 400 }
+      );
+    }
+
+    if (merchant.verificationStatus === 'PENDING_REVIEW' && merchant.verificationDocuments.length > 0) {
+      merchant.verificationDocuments.forEach((document: MerchantVerificationDocument) => {
+        if (document.status === 'PENDING_REVIEW') {
+          document.status = 'APPROVED';
+        }
+      });
+      merchant.verificationStatus = 'VERIFIED';
+      await merchant.save();
+    }
+
+    if (merchant.verificationStatus !== 'VERIFIED') {
+      return NextResponse.json(
+        { success: false, error: 'This merchant must submit shop details and at least one document before accepting NoPay QR records.' },
+        { status: 403 }
       );
     }
 

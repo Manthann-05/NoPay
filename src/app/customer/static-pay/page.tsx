@@ -19,6 +19,7 @@ export default function CustomerStaticPayPage() {
   const [merchant, setMerchant] = useState<{
     merchantId: string;
     merchantName: string;
+    canAcceptQrRecords: boolean | null;
   } | null>(null);
   const [amount, setAmount] = useState<string>('');
   const [note, setNote] = useState<string>('');
@@ -35,6 +36,7 @@ export default function CustomerStaticPayPage() {
     setMerchant({
       merchantId: result.merchantId,
       merchantName: result.merchantName || 'Merchant',
+      canAcceptQrRecords: null,
     });
 
     if (typeof navigator !== 'undefined' && navigator.onLine) {
@@ -45,6 +47,7 @@ export default function CustomerStaticPayPage() {
             setMerchant({
               merchantId: result.merchantId,
               merchantName: data.merchant.shopName,
+              canAcceptQrRecords: data.merchant.canAcceptQrRecords === true,
             });
           }
         })
@@ -220,6 +223,11 @@ export default function CustomerStaticPayPage() {
             </div>
           )}
 
+          {merchant.canAcceptQrRecords === false ? (
+            <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              This merchant needs to submit shop details and at least one supporting document before NoPay can accept QR transaction records.
+            </div>
+          ) : (
           <form onSubmit={handlePay} className="space-y-5">
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-2">Enter Amount (₹)</label>
@@ -277,6 +285,7 @@ export default function CustomerStaticPayPage() {
               )}
             </button>
           </form>
+          )}
 
           <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 font-semibold pt-2">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />

@@ -82,9 +82,8 @@ export async function DELETE(
     if (merchant.verificationDocuments.length === 0) {
       merchant.verificationStatus = 'NOT_SUBMITTED';
       merchant.verificationSubmittedAt = undefined;
-    } else if (merchant.verificationStatus === 'VERIFIED' || merchant.verificationStatus === 'NEEDS_CHANGES') {
-      merchant.verificationStatus = 'PENDING_REVIEW';
-      merchant.verificationSubmittedAt = new Date();
+    } else {
+      merchant.verificationStatus = 'VERIFIED';
     }
 
     await merchant.save();
