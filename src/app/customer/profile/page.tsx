@@ -110,7 +110,7 @@ export default function CustomerProfilePage() {
         </div>
 
         {/* Role Switcher Section */}
-        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3">
+        <div className="w-fit max-w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3">
           <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Active Mode</span>
           <RoleSwitcher
             currentRole={user?.activeRole || 'CUSTOMER'}
@@ -138,7 +138,7 @@ export default function CustomerProfilePage() {
 
       <button
         onClick={() => router.push('/customer/autopay')}
-        className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:border-brand-blue lg:col-start-2"
+        className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:border-brand-blue lg:col-start-1"
       >
         <span className="rounded-xl bg-blue-50 p-2 text-blue-700">
           <CreditCard className="h-5 w-5" />
@@ -150,7 +150,7 @@ export default function CustomerProfilePage() {
       </button>
 
       {/* Customer Static QR Card */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-card p-6 space-y-4 lg:col-start-2">
+      <div className="flex min-h-full flex-col justify-between bg-white rounded-3xl border border-slate-200 shadow-card p-6 space-y-4 lg:col-start-2 lg:row-start-1 lg:row-span-2">
         <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100">
           <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
             <QrCode className="w-5 h-5" />
@@ -161,7 +161,7 @@ export default function CustomerProfilePage() {
           </div>
         </div>
 
-        <div className="pt-2">
+        <div className="flex flex-1 items-center justify-center py-4">
           <QrCodeGenerator
             value={customerQrPayload}
             size={200}
