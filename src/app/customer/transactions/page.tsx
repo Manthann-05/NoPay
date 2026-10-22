@@ -2,7 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getOfflineTransactions } from '@/offline/queue';
+import {
+  getCustomerOfflineTransactions,
+  isCurrentCustomerTransaction,
+} from '@/offline/queue';
 import { subscribeToTransactionEvents } from '@/offline/liveChannel';
 import { Transaction } from '@/types';
 import { useSnackbar } from '@/components/shared/SnackbarProvider';
@@ -22,24 +25,31 @@ export default function CustomerTransactionsPage() {
     loadTransactions();
 
     const unsubscribe = subscribeToTransactionEvents((detail) => {
-      setTransactions((prev) => {
-        const map = new Map<string, Transaction>();
-        map.set(detail.transaction.transactionId, detail.transaction);
-        prev.forEach((t) => {
-          if (!map.has(t.transactionId)) map.set(t.transactionId, t);
-        });
-        return Array.from(map.values()).sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-      });
+      void isCurrentCustomerTransaction(detail.transaction)
+        .then((isCurrentCustomer) => {
+          if (!isCurrentCustomer) return;
+          setTransactions((prev) => {
+            const map = new Map<string, Transaction>();
+            map.set(detail.transaction.transactionId, detail.transaction);
+            prev.forEach((t) => {
+              if (!map.has(t.transactionId)) map.set(t.transactionId, t);
+            });
+            return Array.from(map.values()).sort(
+              (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
+          });
 
-      if (detail.action === 'SYNCED') {
-        showSnackbar({
-          type: 'success',
-          title: 'QR Record Received',
-          description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId} is saved in NoPay. This does not confirm any external payment.`,
+          if (detail.action === 'SYNCED') {
+            showSnackbar({
+              type: 'success',
+              title: 'QR Record Received',
+              description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId} is saved in NoPay. This does not confirm any external payment.`,
+            });
+          }
+        })
+        .catch((err: unknown) => {
+          console.warn('Could not verify customer transaction event:', err);
         });
-      }
     });
 
     return () => {
@@ -50,8 +60,10 @@ export default function CustomerTransactionsPage() {
   const loadTransactions = async () => {
     setLoading(true);
     try {
+      const { getLocalSession } = await import('@/offline/session');
+      const session = await getLocalSession();
       // 1. Fetch offline Dexie transactions
-      const localTxns = await getOfflineTransactions();
+      const localTxns = await getCustomerOfflineTransactions();
 
       // 2. Fetch server transactions if online
       let serverTxns: Transaction[] = [];
@@ -59,7 +71,12 @@ export default function CustomerTransactionsPage() {
         const res = await fetch('/api/transactions');
         if (res.ok) {
           const data = await res.json();
-          serverTxns = data.transactions || [];
+          serverTxns = Array.isArray(data.transactions)
+            ? data.transactions.filter(
+                (transaction: Transaction) =>
+                  Boolean(session?.userId) && String(transaction.customerId) === session?.userId
+              )
+            : [];
         }
       } catch (err) {
         console.warn('Could not fetch server transactions:', err);

@@ -83,7 +83,7 @@ export default function CustomerProfilePage() {
   }
 
   return (
-    <div className="max-w-md mx-auto py-6 px-4 space-y-6">
+    <div className="max-w-7xl mx-auto py-6 px-4 space-y-6">
       <button
         onClick={() => router.push('/customer/dashboard')}
         className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-navy-900 transition-colors"
@@ -92,6 +92,7 @@ export default function CustomerProfilePage() {
         <span>Dashboard</span>
       </button>
 
+      <div className="grid items-start gap-6 lg:grid-cols-2">
       {/* Profile Card */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-card p-6 space-y-6">
         <div className="flex items-center gap-4">
@@ -137,7 +138,7 @@ export default function CustomerProfilePage() {
 
       <button
         onClick={() => router.push('/customer/autopay')}
-        className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:border-brand-blue"
+        className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:border-brand-blue lg:col-start-2"
       >
         <span className="rounded-xl bg-blue-50 p-2 text-blue-700">
           <CreditCard className="h-5 w-5" />
@@ -149,7 +150,7 @@ export default function CustomerProfilePage() {
       </button>
 
       {/* Customer Static QR Card */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-card p-6 space-y-4">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-card p-6 space-y-4 lg:col-start-2">
         <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100">
           <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
             <QrCode className="w-5 h-5" />
@@ -177,6 +178,7 @@ export default function CustomerProfilePage() {
             Show this QR code to merchants or scan it to identify your customer wallet even without an internet connection.
           </p>
         </div>
+      </div>
       </div>
     </div>
   );

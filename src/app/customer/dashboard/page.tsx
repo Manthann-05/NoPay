@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { QrCode, History, Store, ArrowRight, Zap, Clock, CreditCard } from 'lucide-react';
 import { QrScannerModal } from '@/components/qr/QrScannerModal';
-import { getAllLocalTransactions } from '@/offline/queue';
+import { getCustomerOfflineTransactions } from '@/offline/queue';
 import { ScannedQrResult } from '@/lib/qr/payload';
 import { storeScannedQrRaw } from '@/lib/qr/scanHandoff';
 import { Transaction } from '@/types';
@@ -23,10 +23,12 @@ export default function CustomerDashboardPage() {
 
   useEffect(() => {
     async function loadData() {
+      let customerId: string | undefined;
       try {
         const { getLocalSession } = await import('@/offline/session');
         const session = await getLocalSession();
         if (session) {
+          customerId = session.userId;
           setUser({ name: session.name, email: session.email });
         }
 
@@ -36,6 +38,7 @@ export default function CustomerDashboardPage() {
             if (res.ok) {
               const data = await res.json();
               if (data.authenticated && data.user) {
+                customerId = data.user.userId;
                 setUser(data.user);
               }
             }
@@ -44,8 +47,30 @@ export default function CustomerDashboardPage() {
           }
         }
 
-        const localData = await getAllLocalTransactions();
-        setRecentTxns(localData.slice(0, 5));
+        const [localData, serverResponse] = await Promise.all([
+          getCustomerOfflineTransactions(),
+          typeof navigator !== 'undefined' && navigator.onLine
+            ? fetch('/api/transactions').catch(() => null)
+            : Promise.resolve(null),
+        ]);
+        let serverData: Transaction[] = [];
+        if (serverResponse?.ok) {
+          const data = await serverResponse.json();
+          serverData = Array.isArray(data.transactions)
+            ? data.transactions.filter(
+                (transaction: Transaction) =>
+                  Boolean(customerId) && String(transaction.customerId) === customerId
+              )
+            : [];
+        }
+        const transactions = new Map<string, Transaction>();
+        localData.forEach((transaction) => transactions.set(transaction.transactionId, transaction));
+        serverData.forEach((transaction) => transactions.set(transaction.transactionId, transaction));
+        setRecentTxns(
+          Array.from(transactions.values())
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 5)
+        );
       } catch (err) {
         console.error('Customer dashboard load error:', err);
       } finally {
@@ -70,7 +95,7 @@ export default function CustomerDashboardPage() {
   };
 
   return (
-    <div className="max-w-xl mx-auto space-y-6 pb-12 font-mono">
+    <div className="max-w-7xl mx-auto space-y-6 pb-12 font-mono">
       {/* Top Welcome Banner */}
       <div className="neo-box p-6 space-y-3">
         <div className="flex items-center justify-between">
@@ -94,6 +119,7 @@ export default function CustomerDashboardPage() {
       </div>
 
       {/* Dominant Scan Button */}
+      <div className="grid items-start gap-6 lg:grid-cols-2">
       <div className="neo-box p-6 text-center space-y-4">
         <div className="w-16 h-16 border-2 border-border bg-foreground text-background flex items-center justify-center mx-auto shadow-[3px_3px_0px_0px_var(--border)]">
           <QrCode className="w-8 h-8" />
@@ -118,7 +144,7 @@ export default function CustomerDashboardPage() {
       {/* AutoPay Mandate Navigation Link */}
       <Link
         href="/customer/autopay"
-        className="neo-box p-4 flex items-center gap-3 hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all block"
+        className="neo-box p-4 flex items-center gap-3 hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all block lg:col-start-1"
       >
         <span className="border-2 border-border bg-foreground text-background p-2">
           <CreditCard className="h-5 w-5" />
@@ -133,15 +159,12 @@ export default function CustomerDashboardPage() {
       </Link>
 
       {/* Recent Activity List */}
-      <div className="neo-box p-6 space-y-4">
+      <div className="neo-box p-6 space-y-4 lg:col-start-2 lg:row-start-1 lg:row-span-2">
         <div className="flex items-center justify-between border-b-2 border-border pb-3">
           <div className="flex items-center gap-2">
             <History className="w-4 h-4" />
             <h3 className="font-black uppercase text-xs text-foreground">RECENT QR RECORDS</h3>
           </div>
-          <p className="text-[11px] leading-5 text-foreground-muted">
-            A QR record is not a payment receipt. NoPay does not confirm cash, UPI, or bank payments made outside the app.
-          </p>
           <Link
             href="/customer/transactions"
             className="text-xs font-bold underline text-foreground hover:opacity-80 flex items-center gap-1"
@@ -150,6 +173,9 @@ export default function CustomerDashboardPage() {
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
+        <p className="text-[11px] leading-5 text-foreground-muted">
+          A QR record is not a payment receipt. NoPay does not confirm cash, UPI, or bank payments made outside the app.
+        </p>
 
         {recentTxns.length === 0 ? (
           <div className="text-center py-8 px-4 border-2 border-dashed border-border bg-background">
@@ -184,7 +210,7 @@ export default function CustomerDashboardPage() {
       </div>
 
       {/* Enable Merchant Mode Promotion */}
-      <div className="neo-box p-5 flex items-center justify-between">
+      <div className="neo-box p-5 flex items-center justify-between lg:col-start-1">
         <div className="space-y-1">
           <div className="text-[10px] font-black uppercase text-foreground-muted flex items-center gap-1">
             <Store className="w-3.5 h-3.5" />
@@ -199,6 +225,7 @@ export default function CustomerDashboardPage() {
         >
           ENABLE NOW
         </Link>
+      </div>
       </div>
 
       {/* QR Scanner Camera Modal */}
