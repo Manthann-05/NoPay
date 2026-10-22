@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getRequiredMerchantSession } from '@/lib/auth/apiGuards';
 import { connectToDatabase } from '@/lib/db/mongodb';
-import { createPrivateDocumentDownload, deletePrivateDocument } from '@/lib/storage/privateS3';
+import {
+  createPrivateDocumentReadStream,
+  deletePrivateDocument,
+} from '@/lib/storage/privateMongoDocuments';
 import { merchantVerificationApiError } from '@/lib/merchant/verificationApiErrors';
 import { MerchantProfile, type MerchantVerificationDocument } from '@/models/MerchantProfile';
 
@@ -32,8 +35,15 @@ export async function GET(
       return NextResponse.json({ error: 'Uploaded document not found.' }, { status: 404 });
     }
 
-    const url = await createPrivateDocumentDownload(document.storageKey, document.fileName);
-    return NextResponse.redirect(url, { status: 302 });
+    const safeFileName = document.fileName.replace(/[\r\n"\\]/g, '_').slice(0, 180) || 'document';
+    return new Response(createPrivateDocumentReadStream(document.storageKey), {
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodeURIComponent(safeFileName)}`,
+        'Cache-Control': 'private, no-store',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
   } catch (error: unknown) {
     return merchantVerificationApiError(error, 'Could not download the private document.');
   }

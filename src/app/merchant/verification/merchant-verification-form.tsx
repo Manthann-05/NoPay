@@ -141,42 +141,16 @@ export function MerchantVerificationForm() {
     setError(null);
     setNotice(null);
     try {
-      const uploadResponse = await fetch('/api/merchant/verification/documents/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          documentType,
-          fileName: file.name,
-          contentType: file.type,
-          sizeBytes: file.size,
-        }),
-      });
-      const uploadData = await uploadResponse.json();
-      if (!uploadResponse.ok) {
-        throw new Error(uploadData.error || 'Could not prepare the private document upload.');
-      }
-
       const uploadForm = new FormData();
-      for (const [key, value] of Object.entries(uploadData.fields as Record<string, string>)) {
-        uploadForm.append(key, value);
-      }
+      uploadForm.append('documentType', documentType);
       uploadForm.append('file', file, file.name);
-      const storageResponse = await fetch(uploadData.uploadUrl, {
+      const uploadResponse = await fetch('/api/merchant/verification/documents/upload', {
         method: 'POST',
         body: uploadForm,
       });
-      if (!storageResponse.ok) {
-        throw new Error('Private storage rejected the file. Check the storage bucket CORS settings and try again.');
-      }
-
-      const completeResponse = await fetch('/api/merchant/verification/documents/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documentId: uploadData.documentId }),
-      });
-      const completeData = await completeResponse.json();
-      if (!completeResponse.ok) {
-        throw new Error(completeData.error || 'Could not validate the uploaded document.');
+      const uploadData = await uploadResponse.json();
+      if (!uploadResponse.ok) {
+        throw new Error(uploadData.error || 'Could not upload the private document.');
       }
 
       setFile(null);

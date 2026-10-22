@@ -10,9 +10,6 @@ export function merchantVerificationApiError(error: unknown, action: string) {
   if (statusCode === 401 || statusCode === 403) {
     return authErrorResponse(error);
   }
-  if (error instanceof Error && error.message === 'Private document storage is not configured.') {
-    return NextResponse.json({ error: error.message }, { status: 503 });
-  }
 
   console.error(`${action}:`, error);
   return NextResponse.json({ error: `${action} Please try again.` }, { status: 500 });
