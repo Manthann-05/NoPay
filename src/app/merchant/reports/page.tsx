@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { getOfflineTransactions } from '@/offline/queue';
+import { getMerchantOfflineTransactions } from '@/offline/queue';
 import { Transaction } from '@/types';
 import { BarChart3, TrendingUp, CreditCard, Calendar, RefreshCw, ArrowRight } from 'lucide-react';
 
@@ -44,7 +44,7 @@ export default function MerchantReportsPage() {
   const loadTransactions = async () => {
     setLoading(true);
     try {
-      const localTxns = await getOfflineTransactions();
+      const localTxns = await getMerchantOfflineTransactions();
       let serverTxns: Transaction[] = [];
 
       try {

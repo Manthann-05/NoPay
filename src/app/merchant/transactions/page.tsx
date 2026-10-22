@@ -1,7 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { getOfflineTransactions } from '@/offline/queue';
+import {
+  getMerchantOfflineTransactions,
+  isCurrentMerchantTransaction,
+} from '@/offline/queue';
 import { offlineDb } from '@/offline/db';
 import { subscribeToTransactionEvents } from '@/offline/liveChannel';
 import { Transaction } from '@/types';
@@ -23,33 +26,38 @@ export default function MerchantTransactionsPage() {
 
     // Listen to transaction events from this window or another tab on this device.
     const unsubscribe = subscribeToTransactionEvents((detail) => {
-      // Upsert transaction immediately in local state
-      setTransactions((prev) => {
-        const map = new Map<string, Transaction>();
-        map.set(detail.transaction.transactionId, detail.transaction);
-        prev.forEach((t) => {
-          if (!map.has(t.transactionId)) map.set(t.transactionId, t);
-        });
-        return Array.from(map.values()).sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-      });
+      void isCurrentMerchantTransaction(detail.transaction)
+        .then((isCurrentMerchant) => {
+          if (!isCurrentMerchant) return;
 
-      if (detail.action === 'CREATED') {
-        showSnackbar({
-          type: detail.isOffline ? 'pending' : 'success',
-          title: detail.isOffline ? 'New Offline Record Received' : 'Transaction Record Created',
-          description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId}. NoPay has not verified a money transfer.`,
-          durationMs: 5000,
-        });
-      } else if (detail.action === 'SYNCED') {
-        showSnackbar({
-          type: 'success',
-          title: 'Transaction Record Synced',
-          description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId} is recorded in the NoPay ledger.`,
-          durationMs: 4000,
-        });
-      }
+          setTransactions((prev) => {
+            const map = new Map<string, Transaction>();
+            map.set(detail.transaction.transactionId, detail.transaction);
+            prev.forEach((t) => {
+              if (!map.has(t.transactionId)) map.set(t.transactionId, t);
+            });
+            return Array.from(map.values()).sort(
+              (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
+          });
+
+          if (detail.action === 'CREATED') {
+            showSnackbar({
+              type: detail.isOffline ? 'pending' : 'success',
+              title: detail.isOffline ? 'New Offline Record Received' : 'Transaction Record Created',
+              description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId}. NoPay has not verified a money transfer.`,
+              durationMs: 5000,
+            });
+          } else if (detail.action === 'SYNCED') {
+            showSnackbar({
+              type: 'success',
+              title: 'Transaction Record Synced',
+              description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId} is recorded in the NoPay ledger.`,
+              durationMs: 4000,
+            });
+          }
+        })
+        .catch((err: unknown) => console.warn('Could not verify merchant transaction event:', err));
     });
 
     return () => {
@@ -77,7 +85,7 @@ export default function MerchantTransactionsPage() {
     refreshInProgress.current = true;
     if (showLoading) setLoading(true);
     try {
-      const localTxns = await getOfflineTransactions();
+      const localTxns = await getMerchantOfflineTransactions();
       let serverTxns: Transaction[] = [];
 
       if (navigator.onLine) {

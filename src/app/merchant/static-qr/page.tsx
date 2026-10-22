@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { QrCodeGenerator } from '@/components/qr/QrCodeGenerator';
 import { encodeStaticMerchantQrPayload } from '@/lib/qr/payload';
 import { subscribeToTransactionEvents } from '@/offline/liveChannel';
-import { getOfflineTransactions } from '@/offline/queue';
+import { getMerchantOfflineTransactions } from '@/offline/queue';
 import { Transaction } from '@/types';
 import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
 import { useSnackbar } from '@/components/shared/SnackbarProvider';
@@ -20,7 +20,7 @@ export default function MerchantStaticQrPage() {
 
   const loadLocalTxns = async () => {
     try {
-      const all = await getOfflineTransactions();
+      const all = await getMerchantOfflineTransactions();
       const staticOnes = all.filter((t) => t.type === 'STATIC_QR');
       setIncomingTxns(staticOnes.slice(0, 5));
     } catch {

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getOfflineTransactions } from '@/offline/queue';
+import { getMerchantOfflineTransactions, isCurrentMerchantTransaction } from '@/offline/queue';
 import { subscribeToTransactionEvents } from '@/offline/liveChannel';
 import { Transaction } from '@/types';
 import { transactionStatusLabel, transactionStatusTone } from '@/lib/status/labels';
@@ -38,15 +38,20 @@ export default function MerchantDashboardPage() {
     loadDashboardData();
 
     const unsubscribe = subscribeToTransactionEvents((detail) => {
-      loadDashboardData();
-      if (detail.action === 'CREATED') {
-        showSnackbar({
-          type: detail.isOffline ? 'pending' : 'success',
-          title: detail.isOffline ? 'New Offline Record Received' : 'Transaction Record Created',
-          description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId}.`,
-          durationMs: 5000,
-        });
-      }
+      void isCurrentMerchantTransaction(detail.transaction)
+        .then((isCurrentMerchant) => {
+          if (!isCurrentMerchant) return;
+          loadDashboardData();
+          if (detail.action === 'CREATED') {
+            showSnackbar({
+              type: detail.isOffline ? 'pending' : 'success',
+              title: detail.isOffline ? 'New Offline Record Received' : 'Transaction Record Created',
+              description: `₹${detail.transaction.amount.toFixed(2)} · ${detail.transaction.transactionId}.`,
+              durationMs: 5000,
+            });
+          }
+        })
+        .catch((err: unknown) => console.warn('Could not verify merchant transaction event:', err));
     });
 
     return () => {
@@ -58,8 +63,14 @@ export default function MerchantDashboardPage() {
     setLoading(true);
     try {
       const { offlineDb } = await import('@/offline/db');
-      const localTxns = await getOfflineTransactions();
-      let productsCount = await offlineDb.products.count();
+      const { getLocalSession } = await import('@/offline/session');
+      const [localTxns, session] = await Promise.all([
+        getMerchantOfflineTransactions(),
+        getLocalSession(),
+      ]);
+      let productsCount = session?.merchantProfileId
+        ? await offlineDb.products.where('merchantId').equals(session.merchantProfileId).count()
+        : 0;
 
       let serverTxns: Transaction[] = [];
 

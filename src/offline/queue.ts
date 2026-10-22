@@ -94,4 +94,28 @@ export async function getAllLocalTransactions(): Promise<Transaction[]> {
   return offlineDb.transactions.orderBy('createdAt').reverse().toArray();
 }
 
+export async function getMerchantOfflineTransactions(): Promise<Transaction[]> {
+  const session = await offlineDb.localSession.get('current');
+  if (session?.activeRole !== 'MERCHANT' || !session.merchantProfileId) {
+    return [];
+  }
+
+  const transactions = await offlineDb.transactions
+    .where('merchantId')
+    .equals(session.merchantProfileId)
+    .toArray();
+  return transactions.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
+export async function isCurrentMerchantTransaction(transaction: Transaction): Promise<boolean> {
+  const session = await offlineDb.localSession.get('current');
+  return (
+    session?.activeRole === 'MERCHANT' &&
+    Boolean(session.merchantProfileId) &&
+    String(transaction.merchantId) === session.merchantProfileId
+  );
+}
+
 export const getOfflineTransactions = getAllLocalTransactions;

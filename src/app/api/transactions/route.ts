@@ -19,7 +19,10 @@ export async function GET(req: Request) {
 
     const query: any = {};
 
-    if (session.activeRole === 'MERCHANT' && session.merchantProfileId) {
+    if (session.activeRole === 'MERCHANT') {
+      if (!session.merchantProfileId) {
+        return NextResponse.json({ error: 'Merchant profile is unavailable.' }, { status: 403 });
+      }
       query.merchantId = session.merchantProfileId;
     } else {
       query.customerId = session.userId;
